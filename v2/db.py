@@ -115,7 +115,11 @@ def create_client(data: dict) -> dict:
                 "updated_at": ts,
             }
         )
-        return get_client_by_id(cursor.lastrowid)
+        new_id = cursor.lastrowid
+        row = conn.execute(
+            "SELECT * FROM clients WHERE id = ?", (new_id,)
+        ).fetchone()
+        return dict(row) if row else None
 
 
 def update_client(client_slug: str, data: dict) -> dict | None:
@@ -188,7 +192,11 @@ def create_report(client_id: int, triggered_by: str = "manual") -> dict:
             """,
             (client_id, triggered_by, now_utc())
         )
-        return get_report_by_id(cursor.lastrowid)
+        new_id = cursor.lastrowid
+        row = conn.execute(
+            "SELECT * FROM reports WHERE id = ?", (new_id,)
+        ).fetchone()
+        return dict(row) if row else None
 
 
 def update_report_agent(report_id: int, agent_number: int, output: dict):
