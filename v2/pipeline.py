@@ -218,12 +218,14 @@ def run_pipeline(client_slug: str, triggered_by: str = "manual"):
     log_event(client_id, "pipeline_started", report_id=report_id,
               message=f"Triggered by: {triggered_by}")
 
-    # Update report status to running
-    from v2.db import get_connection
+# Update report status to running
+    from v2.db import get_connection, DATABASE_URL
     with get_connection() as conn:
-        conn.execute(
-            "UPDATE reports SET status = 'running' WHERE id = ?", (report_id,)
-        )
+        if DATABASE_URL:
+            with conn.cursor() as cur:
+                cur.execute("UPDATE reports SET status = 'running' WHERE id = %s", (report_id,))
+        else:
+            conn.execute("UPDATE reports SET status = 'running' WHERE id = ?", (report_id,))
 
     print(f"[V2][Pipeline] Starting | client={client_slug} | report_id={report_id}", flush=True)
 
