@@ -1,0 +1,1160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ client.client_name }} — CABlytics</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --ink:       #0d0d12;
+      --ink-2:     #3d3d45;
+      --ink-3:     #8a8a95;
+      --surface:   #f8f8f6;
+      --surface-2: #f0f0ed;
+      --surface-3: #e8e8e4;
+      --border:    #e0e0db;
+      --accent:    #1a1a2e;
+      --red:       #e63946;
+      --green:     #2d9e6b;
+      --amber:     #e8a020;
+      --blue:      #2563eb;
+      --serif:     'Instrument Serif', Georgia, serif;
+      --sans:      'DM Sans', sans-serif;
+      --mono:      'DM Mono', monospace;
+    }
+
+    html { font-size: 15px; scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--sans);
+      background: var(--surface);
+      color: var(--ink);
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    .header {
+      background: var(--accent);
+      padding: 0 48px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-logo {
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: rgba(255,255,255,0.5);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .header-sep { color: rgba(255,255,255,0.2); }
+    .header-client {
+      font-family: var(--sans);
+      font-size: 0.9rem;
+      font-weight: 400;
+      color: #fff;
+    }
+    .header-actions { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+    .header-status {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      padding: 3px 10px;
+      border-radius: 20px;
+      letter-spacing: 0.04em;
+    }
+    .header-status.complete  { background: rgba(45,158,107,0.2); color: #5dd9a0; }
+    .header-status.running   { background: rgba(232,160,32,0.2);  color: #f5c842; }
+    .header-status.no_report { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.4); }
+
+    .btn-rerun {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      color: #fff;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 4px;
+      padding: 6px 14px;
+      cursor: pointer;
+      transition: background 150ms;
+      text-transform: uppercase;
+    }
+    .btn-rerun:hover { background: rgba(255,255,255,0.2); }
+    .btn-rerun:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── Running banner ── */
+    .running-banner {
+      background: #fffbeb;
+      border-bottom: 1px solid #fcd34d;
+      padding: 10px 48px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.82rem;
+      color: #92400e;
+    }
+    .running-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--amber);
+      animation: pulse 1.2s ease-in-out infinite;
+      flex-shrink: 0;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    /* ── Hero ── */
+    .hero {
+      padding: 52px 48px 0;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .hero-eyebrow {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--ink-3);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+    .hero-title {
+      font-family: var(--serif);
+      font-size: 2.6rem;
+      font-weight: 400;
+      color: var(--ink);
+      line-height: 1.15;
+      letter-spacing: -0.01em;
+      margin-bottom: 8px;
+    }
+    .hero-title em { font-style: italic; color: var(--ink-2); }
+    .hero-meta {
+      font-size: 0.82rem;
+      color: var(--ink-3);
+      font-family: var(--mono);
+    }
+
+    /* ── Tab nav ── */
+    .tab-nav {
+      max-width: 1200px;
+      margin: 36px auto 0;
+      padding: 0 48px;
+      display: flex;
+      gap: 2px;
+      border-bottom: 1px solid var(--border);
+    }
+    .tab-btn {
+      font-family: var(--sans);
+      font-size: 0.82rem;
+      font-weight: 400;
+      color: var(--ink-3);
+      background: none;
+      border: none;
+      padding: 10px 18px 12px;
+      cursor: pointer;
+      position: relative;
+      transition: color 150ms;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .tab-btn:hover { color: var(--ink); }
+    .tab-btn.active {
+      color: var(--ink);
+      font-weight: 500;
+    }
+    .tab-btn.active::after {
+      content: '';
+      position: absolute;
+      bottom: -1px; left: 0; right: 0;
+      height: 2px;
+      background: var(--accent);
+    }
+    .tab-num {
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      background: var(--surface-3);
+      color: var(--ink-3);
+      padding: 1px 6px;
+      border-radius: 10px;
+    }
+    .tab-btn.active .tab-num {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    /* ── Tab content ── */
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .content-wrap {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px 48px 80px;
+    }
+
+    /* ── Empty / loading states ── */
+    .empty-state {
+      text-align: center;
+      padding: 80px 0;
+      color: var(--ink-3);
+    }
+    .empty-icon {
+      font-size: 2rem;
+      margin-bottom: 12px;
+      opacity: 0.4;
+    }
+    .empty-title {
+      font-family: var(--serif);
+      font-size: 1.3rem;
+      color: var(--ink-2);
+      margin-bottom: 6px;
+    }
+    .empty-sub { font-size: 0.82rem; }
+
+    /* ── Section headers ── */
+    .section-title {
+      font-family: var(--serif);
+      font-size: 1.4rem;
+      font-weight: 400;
+      color: var(--ink);
+      margin-bottom: 4px;
+    }
+    .section-sub {
+      font-size: 0.8rem;
+      color: var(--ink-3);
+      margin-bottom: 24px;
+      font-family: var(--mono);
+    }
+
+    /* ── Cards ── */
+    .card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 24px;
+      margin-bottom: 16px;
+    }
+    .card-title {
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: var(--ink-2);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    /* ── Grid ── */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+    /* ── Severity badges ── */
+    .badge {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      font-weight: 500;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+    .badge-high   { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+    .badge-medium { background: #fffbeb; color: #92400e; border: 1px solid #fcd34d; }
+    .badge-low    { background: #f0fdf4; color: #14532d; border: 1px solid #86efac; }
+    .badge-blue   { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+
+    /* ── Leak map ── */
+    .leak-item {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px 24px;
+      margin-bottom: 12px;
+      border-left: 3px solid var(--border);
+      transition: border-color 150ms;
+    }
+    .leak-item.high   { border-left-color: var(--red); }
+    .leak-item.medium { border-left-color: var(--amber); }
+    .leak-item.low    { border-left-color: var(--green); }
+
+    .leak-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .leak-page {
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      color: var(--ink);
+      font-weight: 500;
+    }
+    .leak-finding {
+      font-size: 0.875rem;
+      color: var(--ink-2);
+      line-height: 1.55;
+      margin-bottom: 10px;
+    }
+    .leak-hypothesis {
+      font-size: 0.82rem;
+      color: var(--blue);
+      background: #eff6ff;
+      border-radius: 4px;
+      padding: 8px 12px;
+      line-height: 1.5;
+      font-style: italic;
+    }
+    .leak-stats {
+      display: flex;
+      gap: 20px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+    .leak-stat {
+      font-size: 0.75rem;
+      color: var(--ink-3);
+      font-family: var(--mono);
+    }
+    .leak-stat strong { color: var(--ink-2); }
+
+    /* ── Device summary ── */
+    .device-bar {
+      height: 8px;
+      background: var(--surface-3);
+      border-radius: 4px;
+      overflow: hidden;
+      margin: 8px 0;
+    }
+    .device-bar-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 4px;
+    }
+
+    /* ── Ranked tests table ── */
+    .test-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    .test-table th {
+      font-family: var(--mono);
+      font-size: 0.68rem;
+      font-weight: 500;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+      text-align: left;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface-2);
+    }
+    .test-table td {
+      padding: 12px 12px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+      color: var(--ink-2);
+      line-height: 1.45;
+    }
+    .test-table tr:last-child td { border-bottom: none; }
+    .test-table tr:hover td { background: var(--surface); }
+    .score-pill {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      font-weight: 500;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: var(--accent);
+      color: #fff;
+      min-width: 36px;
+      text-align: center;
+    }
+
+    /* ── CEP cards ── */
+    .cep-card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 24px;
+      margin-bottom: 16px;
+    }
+    .cep-rank {
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      color: var(--ink-3);
+      margin-bottom: 6px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .cep-name {
+      font-family: var(--serif);
+      font-size: 1.2rem;
+      color: var(--ink);
+      margin-bottom: 6px;
+    }
+    .cep-desc {
+      font-size: 0.875rem;
+      color: var(--ink-2);
+      line-height: 1.55;
+      margin-bottom: 16px;
+    }
+    .cep-quotes { margin-bottom: 12px; }
+    .cep-quote {
+      font-size: 0.82rem;
+      color: var(--ink-2);
+      border-left: 2px solid var(--border);
+      padding: 6px 12px;
+      margin-bottom: 6px;
+      font-style: italic;
+      line-height: 1.5;
+    }
+    .cep-implication {
+      font-size: 0.75rem;
+      font-family: var(--mono);
+      color: var(--green);
+      background: #f0fdf4;
+      border-radius: 4px;
+      padding: 6px 10px;
+    }
+
+    /* ── Copy variants ── */
+    .copy-variant {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 24px;
+      margin-bottom: 16px;
+    }
+    .copy-formula {
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      color: var(--ink-3);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .copy-headline {
+      font-family: var(--serif);
+      font-size: 1.5rem;
+      color: var(--ink);
+      line-height: 1.25;
+      margin-bottom: 10px;
+    }
+    .copy-rationale {
+      font-size: 0.82rem;
+      color: var(--ink-3);
+      line-height: 1.55;
+    }
+    .copy-rewrite {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 24px;
+      margin-bottom: 16px;
+    }
+    .copy-original {
+      font-size: 0.82rem;
+      color: var(--ink-3);
+      background: var(--surface-2);
+      border-radius: 4px;
+      padding: 12px;
+      margin-bottom: 12px;
+      line-height: 1.6;
+      font-style: italic;
+    }
+    .copy-new {
+      font-size: 0.9rem;
+      color: var(--ink);
+      line-height: 1.65;
+      padding: 12px;
+      background: #f0fdf4;
+      border-radius: 4px;
+      border-left: 3px solid var(--green);
+    }
+
+    /* ── Calendar ── */
+    .calendar-week {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+    .calendar-week-header {
+      background: var(--surface-2);
+      padding: 10px 20px;
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      font-weight: 500;
+      color: var(--ink-2);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+    }
+    .calendar-week-body { padding: 16px 20px; }
+    .calendar-test {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .calendar-test:last-child { border-bottom: none; }
+    .calendar-test-label {
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 2px 7px;
+      border-radius: 3px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .label-launch    { background: #eff6ff; color: #1e40af; }
+    .label-running   { background: #f0fdf4; color: #14532d; }
+    .label-completing{ background: #fdf4ff; color: #6b21a8; }
+
+    .calendar-test-content { flex: 1; }
+    .calendar-test-page {
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      color: var(--ink);
+      margin-bottom: 2px;
+    }
+    .calendar-test-hypo {
+      font-size: 0.8rem;
+      color: var(--ink-3);
+      line-height: 1.45;
+    }
+    .calendar-test-runtime {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--ink-3);
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    /* ── Summary box ── */
+    .summary-box {
+      background: var(--accent);
+      color: #fff;
+      border-radius: 8px;
+      padding: 24px 28px;
+      margin-bottom: 24px;
+      font-size: 0.9rem;
+      line-height: 1.65;
+      font-weight: 300;
+    }
+    .summary-box strong { font-weight: 500; }
+
+    /* ── Word lists ── */
+    .word-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    .word-chip {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      padding: 3px 10px;
+      border-radius: 20px;
+    }
+    .word-chip.remove { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+    .word-chip.add    { background: #f0fdf4; color: #14532d; border: 1px solid #86efac; }
+
+    /* ── Recent runs ── */
+    .run-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.8rem;
+    }
+    .run-row:last-child { border-bottom: none; }
+    .run-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .run-dot.complete { background: var(--green); }
+    .run-dot.failed   { background: var(--red); }
+    .run-dot.running  { background: var(--amber); }
+
+    /* ── Objection cards ── */
+    .objection {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 16px 20px;
+      margin-bottom: 10px;
+    }
+    .objection-text {
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--ink);
+      margin-bottom: 6px;
+    }
+    .objection-response {
+      font-size: 0.8rem;
+      color: var(--ink-3);
+      line-height: 1.5;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      .header { padding: 0 20px; }
+      .hero, .tab-nav, .content-wrap { padding-left: 20px; padding-right: 20px; }
+      .hero-title { font-size: 1.8rem; }
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+      .tab-nav { overflow-x: auto; gap: 0; }
+      .tab-btn { padding: 10px 12px 12px; font-size: 0.78rem; }
+      .running-banner { padding: 10px 20px; }
+    }
+  </style>
+</head>
+<body>
+
+{% set has_report = report and report.get('id') %}
+{% set is_running = active_run and active_run.get('status') in ['pending', 'running'] %}
+
+<header class="header">
+  <span class="header-logo">CABlytics</span>
+  <span class="header-sep">/</span>
+  <span class="header-client">{{ client.client_name }}</span>
+  <div class="header-actions">
+    {% if is_running %}
+      <span class="header-status running">Running</span>
+    {% elif has_report %}
+      <span class="header-status complete">Up to date</span>
+    {% else %}
+      <span class="header-status no_report">No report yet</span>
+    {% endif %}
+    <button class="btn-rerun" id="rerun-btn" onclick="triggerRerun()"
+      {% if is_running %}disabled{% endif %}>
+      ↺ Re-run
+    </button>
+  </div>
+</header>
+
+{% if is_running %}
+<div class="running-banner">
+  <div class="running-dot"></div>
+  <span>Report is currently running — this page will refresh automatically when complete.</span>
+</div>
+{% endif %}
+
+<div class="hero">
+  <div class="hero-eyebrow">CRO intelligence report</div>
+  <h1 class="hero-title">{{ client.client_name }}<br><em>performance dashboard</em></h1>
+  <div class="hero-meta">
+    {% if has_report %}
+      Last updated {{ report.completed_at[:10] if report.completed_at else '—' }}
+      &nbsp;·&nbsp; Triggered by {{ report.run_triggered_by or '—' }}
+    {% else %}
+      No report generated yet — click Re-run to start the pipeline.
+    {% endif %}
+  </div>
+</div>
+
+<nav class="tab-nav">
+  <button class="tab-btn active" onclick="switchTab('funnel', this)">
+    Funnel analysis
+    {% if agents.get('1', {}).get('leak_map') %}
+      <span class="tab-num">{{ agents['1']['leak_map']|length }}</span>
+    {% endif %}
+  </button>
+  <button class="tab-btn" onclick="switchTab('roadmap', this)">
+    Test roadmap
+    {% if agents.get('2', {}).get('ranked_tests') %}
+      <span class="tab-num">{{ agents['2']['ranked_tests']|length }}</span>
+    {% endif %}
+  </button>
+  <button class="tab-btn" onclick="switchTab('research', this)">
+    Consumer research
+    {% if agents.get('3', {}).get('ceps') %}
+      <span class="tab-num">{{ agents['3']['ceps']|length }}</span>
+    {% endif %}
+  </button>
+  <button class="tab-btn" onclick="switchTab('copy', this)">Copy variants</button>
+  <button class="tab-btn" onclick="switchTab('calendar', this)">Test calendar</button>
+</nav>
+
+<!-- ── Tab 1: Funnel analysis ── -->
+<div id="tab-funnel" class="tab-content active">
+  <div class="content-wrap">
+    {% set a1 = agents.get('1', {}) %}
+    {% if not a1 %}
+      <div class="empty-state">
+        <div class="empty-icon">◎</div>
+        <div class="empty-title">No funnel data yet</div>
+        <div class="empty-sub">Run the pipeline to generate the funnel analysis.</div>
+      </div>
+    {% else %}
+      {% if a1.get('summary') %}
+        <div class="summary-box">{{ a1.summary }}</div>
+      {% endif %}
+
+      <div class="section-title">Revenue leak map</div>
+      <div class="section-sub">Pages where drop-off is disproportionate to traffic share</div>
+
+      {% for leak in a1.get('leak_map', []) %}
+        <div class="leak-item {{ leak.get('severity', 'low') }}">
+          <div class="leak-header">
+            <span class="leak-page">{{ leak.get('page', '—') }}</span>
+            <span class="badge badge-{{ leak.get('severity', 'low') }}">{{ leak.get('severity', '—') }}</span>
+            {% if leak.get('sessions') %}
+              <span class="badge badge-blue">{{ '{:,}'.format(leak.sessions) }} sessions</span>
+            {% endif %}
+          </div>
+          {% if leak.get('finding') %}
+            <div class="leak-finding">{{ leak.finding }}</div>
+          {% endif %}
+          {% if leak.get('hypothesis') %}
+            <div class="leak-hypothesis">{{ leak.hypothesis }}</div>
+          {% endif %}
+          <div class="leak-stats">
+            {% if leak.get('bounce_rate') %}
+              <div class="leak-stat">Bounce <strong>{{ '%.0f'|format(leak.bounce_rate * 100) }}%</strong></div>
+            {% endif %}
+            {% if leak.get('engagement_rate') %}
+              <div class="leak-stat">Engagement <strong>{{ '%.0f'|format(leak.engagement_rate * 100) }}%</strong></div>
+            {% endif %}
+            {% if leak.get('mobile_sessions') and leak.get('desktop_sessions') %}
+              <div class="leak-stat">Mobile <strong>{{ '{:,}'.format(leak.mobile_sessions) }}</strong></div>
+              <div class="leak-stat">Desktop <strong>{{ '{:,}'.format(leak.desktop_sessions) }}</strong></div>
+            {% endif %}
+            {% if leak.get('period_change') %}
+              <div class="leak-stat">{{ leak.period_change }}</div>
+            {% endif %}
+          </div>
+          {% if leak.get('mobile_desktop_gap') %}
+            <div style="margin-top:10px; font-size:0.78rem; color:var(--red); font-family:var(--mono);">
+              ⚠ {{ leak.mobile_desktop_gap }}
+            </div>
+          {% endif %}
+        </div>
+      {% endfor %}
+
+      {% if a1.get('device_summary') %}
+        <div class="card" style="margin-top:24px">
+          <div class="card-title">Device split</div>
+          {% set ds = a1.device_summary %}
+          {% if ds.get('primary_device_issue') %}
+            <p style="font-size:0.875rem; color:var(--ink-2); margin-bottom:12px;">{{ ds.primary_device_issue }}</p>
+          {% endif %}
+          {% if ds.get('mobile_desktop_ratio') %}
+            <p style="font-size:0.8rem; color:var(--ink-3); font-family:var(--mono);">{{ ds.mobile_desktop_ratio }}</p>
+          {% endif %}
+          {% if ds.get('overall_mobile_share') %}
+            <div style="margin-top:12px;">
+              <div style="font-size:0.75rem; color:var(--ink-3); margin-bottom:4px; font-family:var(--mono);">
+                Mobile share: {{ '%.0f'|format(ds.overall_mobile_share * 100) }}%
+              </div>
+              <div class="device-bar">
+                <div class="device-bar-fill" style="width:{{ '%.0f'|format(ds.overall_mobile_share * 100) }}%"></div>
+              </div>
+            </div>
+          {% endif %}
+        </div>
+      {% endif %}
+
+      {% if a1.get('acquisition_insights') %}
+        <div class="card">
+          <div class="card-title">Acquisition channels</div>
+          {% for ch in a1.acquisition_insights %}
+            <div style="padding:10px 0; border-bottom:1px solid var(--border);">
+              <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+                <span style="font-family:var(--mono); font-size:0.8rem; font-weight:500;">{{ ch.get('channel','—') }}</span>
+                {% if ch.get('sessions') %}<span class="badge badge-blue">{{ '{:,}'.format(ch.sessions) }}</span>{% endif %}
+                {% if ch.get('bounce_rate') %}<span style="font-size:0.75rem; color:var(--ink-3); font-family:var(--mono);">bounce {{ '%.0f'|format(ch.bounce_rate * 100) }}%</span>{% endif %}
+              </div>
+              {% if ch.get('finding') %}<p style="font-size:0.8rem; color:var(--ink-3);">{{ ch.finding }}</p>{% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endif %}
+  </div>
+</div>
+
+<!-- ── Tab 2: Test roadmap ── -->
+<div id="tab-roadmap" class="tab-content">
+  <div class="content-wrap">
+    {% set a2 = agents.get('2', {}) %}
+    {% if not a2 %}
+      <div class="empty-state">
+        <div class="empty-icon">◎</div>
+        <div class="empty-title">No roadmap yet</div>
+        <div class="empty-sub">Run the pipeline to generate the scored test roadmap.</div>
+      </div>
+    {% else %}
+      {% if a2.get('summary') %}
+        <div class="summary-box">{{ a2.summary }}</div>
+      {% endif %}
+
+      {% if a2.get('quick_wins') %}
+        <div class="card" style="margin-bottom:24px">
+          <div class="card-title">Quick wins</div>
+          {% for qw in a2.quick_wins %}
+            <div style="padding:6px 0; font-size:0.85rem; color:var(--green); border-bottom:1px solid var(--border);">✓ {{ qw }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      <div class="section-title">Ranked test ideas</div>
+      <div class="section-sub">Priority = (Impact × Confidence) ÷ Effort</div>
+
+      <div style="background:#fff; border:1px solid var(--border); border-radius:8px; overflow:hidden;">
+        <table class="test-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Page</th>
+              <th>Hypothesis</th>
+              <th>Type</th>
+              <th style="text-align:center">Impact</th>
+              <th style="text-align:center">Conf.</th>
+              <th style="text-align:center">Effort</th>
+              <th style="text-align:center">Score</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for test in a2.get('ranked_tests', []) %}
+              <tr>
+                <td style="font-family:var(--mono); font-size:0.75rem; color:var(--ink-3);">{{ test.get('rank','—') }}</td>
+                <td style="font-family:var(--mono); font-size:0.78rem; min-width:120px;">{{ test.get('page','—') }}</td>
+                <td style="max-width:300px; font-size:0.8rem;">
+                  {{ test.get('hypothesis','—') }}
+                  {% if test.get('expected_metric_change') %}
+                    <div style="font-size:0.72rem; color:var(--green); margin-top:3px; font-family:var(--mono);">{{ test.expected_metric_change }}</div>
+                  {% endif %}
+                </td>
+                <td><span class="badge badge-blue">{{ test.get('test_type','—') }}</span></td>
+                <td style="text-align:center; font-family:var(--mono); font-size:0.82rem;">{{ test.get('impact_score','—') }}</td>
+                <td style="text-align:center; font-family:var(--mono); font-size:0.82rem;">{{ test.get('confidence_score','—') }}</td>
+                <td style="text-align:center; font-family:var(--mono); font-size:0.82rem;">{{ test.get('effort_score','—') }}</td>
+                <td style="text-align:center;"><span class="score-pill">{{ test.get('priority_score','—') }}</span></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% if a2.get('scoring_notes') %}
+        <div class="card" style="margin-top:20px">
+          <div class="card-title">Scoring notes</div>
+          <p style="font-size:0.85rem; color:var(--ink-2); line-height:1.6;">{{ a2.scoring_notes }}</p>
+        </div>
+      {% endif %}
+    {% endif %}
+  </div>
+</div>
+
+<!-- ── Tab 3: Consumer research ── -->
+<div id="tab-research" class="tab-content">
+  <div class="content-wrap">
+    {% set a3 = agents.get('3', {}) %}
+    {% if not a3 %}
+      <div class="empty-state">
+        <div class="empty-icon">◎</div>
+        <div class="empty-title">No research yet</div>
+        <div class="empty-sub">Run the pipeline to generate consumer research insights.</div>
+      </div>
+    {% else %}
+      {% if a3.get('summary') %}
+        <div class="summary-box">{{ a3.summary }}</div>
+      {% endif %}
+
+      <div class="section-title">Category entry points</div>
+      <div class="section-sub">The specific moments and emotions that trigger purchase</div>
+
+      {% for cep in a3.get('ceps', []) %}
+        <div class="cep-card">
+          <div class="cep-rank">CEP {{ cep.get('rank','') }}</div>
+          <div class="cep-name">{{ cep.get('name','—') }}</div>
+          <div class="cep-desc">{{ cep.get('description','') }}</div>
+          {% if cep.get('triggering_moment') %}
+            <div style="font-size:0.78rem; color:var(--ink-3); margin-bottom:12px;">
+              <strong style="color:var(--ink-2);">Trigger:</strong> {{ cep.triggering_moment }}
+            </div>
+          {% endif %}
+          <div class="cep-quotes">
+            {% for quote in cep.get('quotes', []) %}
+              <div class="cep-quote">"{{ quote }}"</div>
+            {% endfor %}
+          </div>
+          {% if cep.get('funnel_implication') %}
+            <div class="cep-implication">→ {{ cep.funnel_implication }}</div>
+          {% endif %}
+        </div>
+      {% endfor %}
+
+      {% if a3.get('objections') %}
+        <div class="section-title" style="margin-top:32px">Purchase objections</div>
+        <div class="section-sub">The fears that almost stopped the purchase</div>
+        {% for obj in a3.objections %}
+          <div class="objection">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+              <div class="objection-text">{{ obj.get('objection','—') }}</div>
+              <span class="badge badge-{{ 'high' if obj.get('frequency') == 'high' else 'medium' if obj.get('frequency') == 'medium' else 'low' }}">{{ obj.get('frequency','—') }}</span>
+            </div>
+            {% if obj.get('suggested_response') %}
+              <div class="objection-response">→ {{ obj.suggested_response }}</div>
+            {% endif %}
+            {% for quote in obj.get('quotes', [])[:1] %}
+              <div class="cep-quote" style="margin-top:8px;">"{{ quote }}"</div>
+            {% endfor %}
+          </div>
+        {% endfor %}
+      {% endif %}
+
+      {% if a3.get('customer_language') %}
+        <div class="card" style="margin-top:24px">
+          <div class="card-title">Customer language</div>
+          {% for lang in a3.customer_language %}
+            <div style="padding:10px 0; border-bottom:1px solid var(--border);">
+              <div style="font-family:var(--mono); font-size:0.82rem; font-weight:500; color:var(--ink); margin-bottom:3px;">"{{ lang.get('phrase','') }}"</div>
+              <div style="font-size:0.78rem; color:var(--ink-3);">{{ lang.get('use_in_copy','') }}</div>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      {% if a3.get('copy_gap_analysis') %}
+        <div class="card" style="margin-top:16px">
+          <div class="card-title">Copy gap analysis</div>
+          <p style="font-size:0.875rem; color:var(--ink-2); line-height:1.65;">{{ a3.copy_gap_analysis }}</p>
+        </div>
+      {% endif %}
+    {% endif %}
+  </div>
+</div>
+
+<!-- ── Tab 4: Copy variants ── -->
+<div id="tab-copy" class="tab-content">
+  <div class="content-wrap">
+    {% set a4 = agents.get('4', {}) %}
+    {% if not a4 %}
+      <div class="empty-state">
+        <div class="empty-icon">◎</div>
+        <div class="empty-title">No copy variants yet</div>
+        <div class="empty-sub">Run the pipeline to generate copy recommendations.</div>
+      </div>
+    {% else %}
+      {% if a4.get('summary') %}
+        <div class="summary-box">{{ a4.summary }}</div>
+      {% endif %}
+
+      <div class="section-title">Headline variants</div>
+      <div class="section-sub">Three testable headlines — one per proven formula</div>
+
+      {% for v in a4.get('headline_variants', []) %}
+        <div class="copy-variant">
+          <div class="copy-formula">{{ v.get('formula','').replace('_',' ') }}</div>
+          <div class="copy-headline">{{ v.get('headline','—') }}</div>
+          {% if v.get('cep_addressed') %}
+            <div style="font-size:0.75rem; color:var(--blue); font-family:var(--mono); margin-bottom:8px;">CEP: {{ v.cep_addressed }}</div>
+          {% endif %}
+          <div class="copy-rationale">{{ v.get('rationale','') }}</div>
+          {% if v.get('a_b_test_hypothesis') %}
+            <div style="margin-top:10px; font-size:0.78rem; color:var(--ink-3); font-style:italic; background:var(--surface-2); padding:8px 12px; border-radius:4px;">
+              {{ v.a_b_test_hypothesis }}
+            </div>
+          {% endif %}
+        </div>
+      {% endfor %}
+
+      {% if a4.get('pdp_opening_rewrite') %}
+        <div class="section-title" style="margin-top:32px">PDP opening rewrite</div>
+        <div class="section-sub">Original vs recommended</div>
+        <div class="copy-rewrite">
+          {% if a4.pdp_opening_rewrite.get('original') %}
+            <div style="font-size:0.72rem; color:var(--ink-3); font-family:var(--mono); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:6px;">Current</div>
+            <div class="copy-original">{{ a4.pdp_opening_rewrite.original }}</div>
+          {% endif %}
+          <div style="font-size:0.72rem; color:var(--green); font-family:var(--mono); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:6px;">Recommended</div>
+          <div class="copy-new">{{ a4.pdp_opening_rewrite.get('rewritten','—') }}</div>
+          {% if a4.pdp_opening_rewrite.get('changes_made') %}
+            <div style="margin-top:10px; font-size:0.78rem; color:var(--ink-3);">{{ a4.pdp_opening_rewrite.changes_made }}</div>
+          {% endif %}
+        </div>
+      {% endif %}
+
+      <div class="grid-2" style="margin-top:8px;">
+        {% if a4.get('words_to_remove') %}
+          <div class="card">
+            <div class="card-title">Remove these words</div>
+            <div class="word-list">
+              {% for w in a4.words_to_remove %}
+                <span class="word-chip remove">{{ w }}</span>
+              {% endfor %}
+            </div>
+          </div>
+        {% endif %}
+        {% if a4.get('words_to_add') %}
+          <div class="card">
+            <div class="card-title">Add these phrases</div>
+            <div class="word-list">
+              {% for w in a4.words_to_add %}
+                <span class="word-chip add">{{ w }}</span>
+              {% endfor %}
+            </div>
+          </div>
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ── Tab 5: Test calendar ── -->
+<div id="tab-calendar" class="tab-content">
+  <div class="content-wrap">
+    {% set a5 = agents.get('5', {}) %}
+    {% if not a5 %}
+      <div class="empty-state">
+        <div class="empty-icon">◎</div>
+        <div class="empty-title">No calendar yet</div>
+        <div class="empty-sub">Run the pipeline to generate the 30-day test calendar.</div>
+      </div>
+    {% else %}
+      {% if a5.get('summary') %}
+        <div class="summary-box">{{ a5.summary }}</div>
+      {% endif %}
+
+      <div class="grid-2" style="margin-bottom:24px;">
+        {% if a5.get('parallel_test_count') %}
+          <div class="card">
+            <div class="card-title">Parallel tests</div>
+            <div style="font-family:var(--serif); font-size:2rem; color:var(--ink);">{{ a5.parallel_test_count }}</div>
+            {% if a5.get('sequential_vs_parallel_uplift') %}
+              <p style="font-size:0.78rem; color:var(--ink-3); margin-top:6px;">{{ a5.sequential_vs_parallel_uplift }}</p>
+            {% endif %}
+          </div>
+        {% endif %}
+        {% if a5.get('bandwidth_check') %}
+          {% set bw = a5.bandwidth_check %}
+          <div class="card">
+            <div class="card-title">Bandwidth check</div>
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+              <span style="font-family:var(--serif); font-size:2rem; color:{{ 'var(--green)' if bw.get('feasible') else 'var(--red)' }};">
+                {{ '✓' if bw.get('feasible') else '✗' }}
+              </span>
+              <span style="font-size:0.82rem; color:var(--ink-2);">{{ 'Feasible' if bw.get('feasible') else 'Over capacity' }}</span>
+            </div>
+            {% if bw.get('note') %}
+              <p style="font-size:0.78rem; color:var(--ink-3);">{{ bw.note }}</p>
+            {% endif %}
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="section-title">30-day test calendar</div>
+      <div class="section-sub">Tests stacked in parallel where page conflicts allow</div>
+
+      {% for week in a5.get('calendar', []) %}
+        <div class="calendar-week">
+          <div class="calendar-week-header">Week {{ week.get('week','') }}</div>
+          <div class="calendar-week-body">
+            {% for test in week.get('launch', []) %}
+              <div class="calendar-test">
+                <span class="calendar-test-label label-launch">Launch</span>
+                <div class="calendar-test-content">
+                  <div class="calendar-test-page">{{ test.get('page','—') }}</div>
+                  <div class="calendar-test-hypo">{{ test.get('hypothesis','') }}</div>
+                </div>
+                {% if test.get('estimated_runtime_days') %}
+                  <div class="calendar-test-runtime">~{{ test.estimated_runtime_days }}d</div>
+                {% endif %}
+              </div>
+            {% endfor %}
+            {% for test in week.get('running', []) %}
+              <div class="calendar-test">
+                <span class="calendar-test-label label-running">Running</span>
+                <div class="calendar-test-content">
+                  <div class="calendar-test-page">{{ test.get('page', test if test is string else '—') }}</div>
+                </div>
+              </div>
+            {% endfor %}
+            {% for test in week.get('completing', []) %}
+              <div class="calendar-test">
+                <span class="calendar-test-label label-completing">Completing</span>
+                <div class="calendar-test-content">
+                  <div class="calendar-test-page">{{ test.get('page', test if test is string else '—') }}</div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      {% endfor %}
+
+      {% if a5.get('tests_flagged_slow') %}
+        <div class="card" style="margin-top:16px; border-color:#fecaca;">
+          <div class="card-title" style="color:var(--red);">Tests flagged — slow to significance</div>
+          {% for t in a5.tests_flagged_slow %}
+            <div style="padding:8px 0; border-bottom:1px solid var(--border); font-size:0.82rem; color:var(--ink-2);">
+              Test #{{ t.get('test_rank','') }} — {{ t.get('reason','') }}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endif %}
+  </div>
+</div>
+
+<script>
+  function switchTab(name, btn) {
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    btn.classList.add('active');
+  }
+
+  async function triggerRerun() {
+    const btn = document.getElementById('rerun-btn');
+    btn.disabled = true;
+    btn.textContent = '↺ Starting…';
+    try {
+      const res = await fetch('/v2/report/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ client_slug: '{{ client.client_slug }}', triggered_by: 'manual' })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        btn.textContent = '↺ Running…';
+        pollStatus();
+      } else {
+        alert(data.error || 'Failed to start run.');
+        btn.disabled = false;
+        btn.textContent = '↺ Re-run';
+      }
+    } catch(e) {
+      alert('Network error.');
+      btn.disabled = false;
+      btn.textContent = '↺ Re-run';
+    }
+  }
+
+  function pollStatus() {
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch('/v2/report/{{ client.client_slug }}/status');
+        const data = await res.json();
+        if (data.status === 'complete') {
+          clearInterval(interval);
+          window.location.reload();
+        }
+      } catch(e) { /* keep polling */ }
+    }, 8000);
+  }
+
+  // Auto-poll if a run is currently active
+  {% if is_running %}
+  pollStatus();
+  {% endif %}
+</script>
+</body>
+</html>

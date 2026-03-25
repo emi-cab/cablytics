@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CABlytics V2 — Clients</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --ink: #0f0f10; --ink-2: #3a3a3f; --ink-3: #7a7a85;
+      --surface: #f7f7f5; --border: #ddddd8;
+      --accent: #1a1a2e; --red: #e63946; --green: #2d9e6b;
+      --mono: 'DM Mono', monospace; --sans: 'DM Sans', sans-serif;
+    }
+    body { font-family: var(--sans); background: var(--surface); color: var(--ink); min-height: 100vh; }
+    .header {
+      background: var(--accent); padding: 0 48px; height: 60px;
+      display: flex; align-items: center; gap: 16px; position: sticky; top: 0; z-index: 10;
+    }
+    .header-logo { font-family: var(--mono); font-size: 0.85rem; color: rgba(255,255,255,0.5); letter-spacing: 0.06em; text-transform: uppercase; }
+    .header-title { font-size: 0.9rem; color: #fff; }
+    .header-actions { margin-left: auto; }
+    .btn { font-family: var(--mono); font-size: 0.72rem; font-weight: 500; letter-spacing: 0.04em; color: #fff;
+      background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); border-radius: 4px;
+      padding: 6px 14px; cursor: pointer; text-decoration: none; text-transform: uppercase; }
+    .page { max-width: 1000px; margin: 0 auto; padding: 48px 32px; }
+    .page-title { font-size: 1.5rem; font-weight: 300; margin-bottom: 32px; color: var(--ink); }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+    th { font-family: var(--mono); font-size: 0.68rem; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase;
+      color: var(--ink-3); text-align: left; padding: 10px 16px; border-bottom: 1px solid var(--border); background: #f8f8f6; }
+    td { padding: 14px 16px; border-bottom: 1px solid var(--border); font-size: 0.85rem; color: var(--ink-2); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #fafafa; }
+    .mono { font-family: var(--mono); font-size: 0.78rem; }
+    .badge { display: inline-block; font-family: var(--mono); font-size: 0.65rem; padding: 2px 8px; border-radius: 10px; }
+    .badge-green { background: #f0fdf4; color: #14532d; border: 1px solid #86efac; }
+    .badge-amber { background: #fffbeb; color: #92400e; border: 1px solid #fcd34d; }
+    .badge-gray  { background: #f1f1f0; color: #6b6b72; border: 1px solid #ddddd8; }
+    a.link { color: var(--accent); text-decoration: none; font-family: var(--mono); font-size: 0.78rem; }
+    a.link:hover { text-decoration: underline; }
+    .empty { text-align: center; padding: 60px; color: var(--ink-3); }
+  </style>
+</head>
+<body>
+<header class="header">
+  <span class="header-logo">CABlytics</span>
+  <span style="color:rgba(255,255,255,0.2)">/</span>
+  <span class="header-title">All clients</span>
+  <div class="header-actions">
+    <a href="/v2/admin/onboard" class="btn">+ New client</a>
+  </div>
+</header>
+<main class="page">
+  <h1 class="page-title">Registered clients</h1>
+  {% if clients %}
+    <table>
+      <thead>
+        <tr>
+          <th>Client</th>
+          <th>Slug</th>
+          <th>GA4 property</th>
+          <th>Schedule</th>
+          <th>Last report</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for client in clients %}
+          {% set info = reports_by_slug.get(client.client_slug, {}) %}
+          {% set latest = info.get('latest') %}
+          {% set active = info.get('active') %}
+          <tr>
+            <td><strong>{{ client.client_name }}</strong></td>
+            <td class="mono">{{ client.client_slug }}</td>
+            <td class="mono">{{ client.ga4_property_id }}</td>
+            <td class="mono">{{ client.report_frequency }} / {{ client.schedule_day }}</td>
+            <td class="mono">
+              {% if latest %}
+                {{ latest.completed_at[:10] if latest.completed_at else '—' }}
+              {% else %}
+                —
+              {% endif %}
+            </td>
+            <td>
+              {% if active %}
+                <span class="badge badge-amber">Running</span>
+              {% elif latest %}
+                <span class="badge badge-green">Complete</span>
+              {% else %}
+                <span class="badge badge-gray">No reports</span>
+              {% endif %}
+            </td>
+            <td>
+              <a href="/v2/dashboard/{{ client.client_slug }}" class="link">Dashboard →</a>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <div class="empty">No clients registered yet. <a href="/v2/admin/onboard" style="color:var(--accent)">Register the first one →</a></div>
+  {% endif %}
+</main>
+</body>
+</html>
