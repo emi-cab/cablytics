@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CABlytics V2 — New client</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --ink:       #0f0f10;
+      --ink-2:     #3a3a3f;
+      --ink-3:     #7a7a85;
+      --surface:   #f7f7f5;
+      --surface-2: #efefec;
+      --border:    #ddddd8;
+      --accent:    #1a1a2e;
+      --accent-2:  #e63946;
+      --mono:      'DM Mono', monospace;
+      --sans:      'DM Sans', sans-serif;
+      --radius:    6px;
+      --transition: 180ms ease;
+    }
+
+    html { font-size: 15px; }
+
+    body {
+      font-family: var(--sans);
+      background: var(--surface);
+      color: var(--ink);
+      min-height: 100vh;
+      padding: 0 0 80px;
+    }
+
+    /* ── Header ── */
+    .header {
+      background: var(--accent);
+      padding: 28px 48px;
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .header-logo {
+      font-family: var(--mono);
+      font-size: 1.1rem;
+      font-weight: 500;
+      color: #fff;
+      letter-spacing: 0.04em;
+    }
+    .header-badge {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--accent-2);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      border: 1px solid var(--accent-2);
+      padding: 2px 7px;
+      border-radius: 20px;
+    }
+    .header-sub {
+      margin-left: auto;
+      font-size: 0.8rem;
+      color: rgba(255,255,255,0.4);
+      font-family: var(--mono);
+    }
+
+    /* ── Layout ── */
+    .page {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 52px 32px 0;
+    }
+
+    .page-title {
+      font-size: 1.75rem;
+      font-weight: 300;
+      color: var(--ink);
+      letter-spacing: -0.02em;
+      margin-bottom: 6px;
+    }
+    .page-title span { font-weight: 500; }
+
+    .page-desc {
+      font-size: 0.875rem;
+      color: var(--ink-3);
+      margin-bottom: 44px;
+      line-height: 1.6;
+    }
+
+    /* ── Section ── */
+    .section {
+      margin-bottom: 44px;
+      opacity: 0;
+      transform: translateY(12px);
+      animation: reveal 400ms ease forwards;
+    }
+    .section:nth-child(1) { animation-delay: 60ms; }
+    .section:nth-child(2) { animation-delay: 120ms; }
+    .section:nth-child(3) { animation-delay: 180ms; }
+    .section:nth-child(4) { animation-delay: 240ms; }
+    .section:nth-child(5) { animation-delay: 300ms; }
+    .section:nth-child(6) { animation-delay: 360ms; }
+
+    @keyframes reveal {
+      to { opacity: 1; transform: none; }
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .section-num {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--accent-2);
+      background: #fdf0f1;
+      border: 1px solid #f5c6ca;
+      padding: 2px 8px;
+      border-radius: 20px;
+      flex-shrink: 0;
+    }
+    .section-title {
+      font-size: 0.95rem;
+      font-weight: 500;
+      color: var(--ink);
+      letter-spacing: -0.01em;
+    }
+    .section-note {
+      margin-left: auto;
+      font-size: 0.75rem;
+      color: var(--ink-3);
+      font-family: var(--mono);
+    }
+
+    /* ── Grid ── */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+    .span-2 { grid-column: span 2; }
+
+    /* ── Field ── */
+    .field { display: flex; flex-direction: column; gap: 5px; }
+
+    label {
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: var(--ink-2);
+      letter-spacing: 0.01em;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    label .req {
+      color: var(--accent-2);
+      font-size: 0.7rem;
+    }
+    label .hint {
+      font-weight: 400;
+      color: var(--ink-3);
+      font-size: 0.73rem;
+      margin-left: auto;
+    }
+
+    input[type="text"],
+    input[type="number"],
+    select,
+    textarea {
+      font-family: var(--sans);
+      font-size: 0.875rem;
+      color: var(--ink);
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 9px 12px;
+      outline: none;
+      transition: border-color var(--transition), box-shadow var(--transition);
+      width: 100%;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+    input[type="text"]:focus,
+    input[type="number"]:focus,
+    select:focus,
+    textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(26,26,46,0.08);
+    }
+    input::placeholder,
+    textarea::placeholder { color: #bbbbb5; }
+
+    textarea { resize: vertical; line-height: 1.55; }
+
+    select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%237a7a85' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 34px;
+      cursor: pointer;
+    }
+
+    /* ── Slug preview ── */
+    .slug-preview {
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      color: var(--ink-3);
+      margin-top: 3px;
+      min-height: 18px;
+      transition: color var(--transition);
+    }
+    .slug-preview.active { color: var(--accent); }
+
+    /* ── URL counter ── */
+    .field-meta {
+      font-size: 0.73rem;
+      color: var(--ink-3);
+      font-family: var(--mono);
+      margin-top: 3px;
+    }
+
+    /* ── Char counter ── */
+    .char-counter {
+      text-align: right;
+      font-size: 0.7rem;
+      font-family: var(--mono);
+      color: var(--ink-3);
+      transition: color var(--transition);
+    }
+    .char-counter.warn { color: #f59e0b; }
+    .char-counter.full { color: var(--accent-2); }
+
+    /* ── Divider ── */
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 8px 0 16px;
+    }
+
+    /* ── Submit area ── */
+    .submit-area {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding-top: 8px;
+    }
+
+    .btn-primary {
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      color: #fff;
+      background: var(--accent);
+      border: none;
+      border-radius: var(--radius);
+      padding: 11px 28px;
+      cursor: pointer;
+      transition: background var(--transition), transform 80ms ease;
+    }
+    .btn-primary:hover { background: #2a2a4a; }
+    .btn-primary:active { transform: scale(0.98); }
+
+    .btn-secondary {
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      color: var(--ink-3);
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 20px;
+      cursor: pointer;
+      transition: border-color var(--transition), color var(--transition);
+      text-decoration: none;
+    }
+    .btn-secondary:hover { border-color: var(--ink-3); color: var(--ink); }
+
+    .submit-note {
+      font-size: 0.75rem;
+      color: var(--ink-3);
+      margin-left: auto;
+      font-family: var(--mono);
+    }
+
+    /* ── Flash messages ── */
+    .flash {
+      padding: 12px 16px;
+      border-radius: var(--radius);
+      font-size: 0.85rem;
+      margin-bottom: 28px;
+      display: none;
+    }
+    .flash.success { background: #ecfdf5; border: 1px solid #6ee7b7; color: #065f46; }
+    .flash.error   { background: #fef2f2; border: 1px solid #fca5a5; color: #991b1b; }
+    .flash.show    { display: block; }
+
+    /* ── Responsive ── */
+    @media (max-width: 620px) {
+      .header { padding: 20px 24px; }
+      .page { padding: 36px 20px 0; }
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+      .span-2 { grid-column: span 1; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <span class="header-logo">CABlytics</span>
+  <span class="header-badge">V2</span>
+  <span class="header-sub">internal · admin only</span>
+</header>
+
+<main class="page">
+  <h1 class="page-title">Register <span>new client</span></h1>
+  <p class="page-desc">Fill in all required fields to onboard a client to the V2 pipeline. The GA4 service account must already have Viewer access to the client's property before running the first report.</p>
+
+  <div id="flash" class="flash"></div>
+
+  <form id="onboard-form" novalidate>
+
+    <!-- 1. Identity -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-num">01</span>
+        <span class="section-title">Client identity</span>
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label for="client_name">Client name <span class="req">required</span></label>
+          <input type="text" id="client_name" name="client_name" placeholder="e.g. Fitness First" required autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="client_slug">URL slug <span class="req">required</span> <span class="hint">auto-generated</span></label>
+          <input type="text" id="client_slug" name="client_slug" placeholder="e.g. fitness-first" required autocomplete="off" pattern="[a-z0-9\-]+">
+          <div class="slug-preview" id="slug-preview">cablytics.onrender.com/v2/dashboard/…</div>
+        </div>
+        <div class="field">
+          <label for="ga4_property_id">GA4 property ID <span class="req">required</span></label>
+          <input type="text" id="ga4_property_id" name="ga4_property_id" placeholder="e.g. 123456789" required autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="client_context">Business context <span class="hint">used in AI prompts</span></label>
+          <input type="text" id="client_context" name="client_context" placeholder="e.g. UK gym chain, primarily mobile traffic, DTC memberships" autocomplete="off">
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. GA4 scope -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-num">02</span>
+        <span class="section-title">GA4 scope</span>
+      </div>
+      <div class="field">
+        <label for="target_urls">Target URLs <span class="hint">one per line</span></label>
+        <textarea id="target_urls" name="target_urls" rows="5" placeholder="/gym-locations/london&#10;/membership/join&#10;/classes&#10;/personal-training"></textarea>
+        <div class="field-meta" id="url-count">0 URLs</div>
+      </div>
+    </div>
+
+    <!-- 3. Consumer research inputs -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-num">03</span>
+        <span class="section-title">Consumer research inputs</span>
+        <span class="section-note">Agent 3 data — set once, update periodically</span>
+      </div>
+      <div class="field" style="margin-bottom:16px">
+        <label for="customer_reviews">Customer reviews <span class="hint">100–300 reviews, plain text</span></label>
+        <textarea id="customer_reviews" name="customer_reviews" rows="8" placeholder="Paste Trustpilot / Google / Amazon reviews here. One review per paragraph is fine — no formatting needed."></textarea>
+        <div class="char-counter" id="reviews-counter">0 chars</div>
+      </div>
+      <div class="field" style="margin-bottom:16px">
+        <label for="competitor_notes">Competitor notes <span class="hint">optional</span></label>
+        <textarea id="competitor_notes" name="competitor_notes" rows="4" placeholder="Paste competitor review snippets or switching reasons observed on forums / Reddit."></textarea>
+      </div>
+      <div class="field">
+        <label for="current_pdp_copy">Current PDP / homepage copy <span class="hint">headline + first paragraph</span></label>
+        <textarea id="current_pdp_copy" name="current_pdp_copy" rows="4" placeholder="Paste the current homepage headline and first paragraph, or the key PDP headline and opening copy."></textarea>
+      </div>
+    </div>
+
+    <!-- 4. Test sizing -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-num">04</span>
+        <span class="section-title">Test sizing</span>
+        <span class="section-note">Used by Agent 5 for calendar sizing</span>
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label for="monthly_traffic">Monthly sessions <span class="hint">approx.</span></label>
+          <input type="number" id="monthly_traffic" name="monthly_traffic" placeholder="e.g. 85000" min="0">
+        </div>
+        <div class="field">
+          <label for="dev_hours_per_week">Dev hours / week <span class="hint">available for test builds</span></label>
+          <input type="number" id="dev_hours_per_week" name="dev_hours_per_week" placeholder="e.g. 8" min="0" max="168">
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. Schedule -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-num">05</span>
+        <span class="section-title">Report schedule</span>
+      </div>
+      <div class="grid-3">
+        <div class="field">
+          <label for="report_frequency">Frequency</label>
+          <select id="report_frequency" name="report_frequency" onchange="updateScheduleDay()">
+            <option value="weekly">Weekly</option>
+            <option value="monthly" selected>Monthly</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="schedule_day" id="schedule_day_label">Day of month</label>
+          <select id="schedule_day" name="schedule_day">
+            <option value="1">1st</option>
+            <option value="8">8th</option>
+            <option value="15">15th</option>
+            <option value="22">22nd</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="run_now">First run</label>
+          <select id="run_now" name="run_now">
+            <option value="yes">Trigger immediately on save</option>
+            <option value="no">Wait for first scheduled run</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6. Submit -->
+    <div class="section">
+      <div class="divider"></div>
+      <div class="submit-area">
+        <button type="submit" class="btn-primary" id="submit-btn">Register client →</button>
+        <a href="/v2/admin/clients" class="btn-secondary">View all clients</a>
+        <span class="submit-note" id="submit-note">All required fields must be filled</span>
+      </div>
+    </div>
+
+  </form>
+</main>
+
+<script>
+  const nameEl   = document.getElementById('client_name');
+  const slugEl   = document.getElementById('client_slug');
+  const preview  = document.getElementById('slug-preview');
+  const urlsEl   = document.getElementById('target_urls');
+  const urlCount = document.getElementById('url-count');
+  const reviewsEl     = document.getElementById('customer_reviews');
+  const reviewCounter = document.getElementById('reviews-counter');
+  const submitBtn  = document.getElementById('submit-btn');
+  const submitNote = document.getElementById('submit-note');
+  const flash      = document.getElementById('flash');
+
+  let slugManuallyEdited = false;
+
+  function toSlug(s) {
+    return s.toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .trim()
+      .replace(/[\s]+/g, '-')
+      .replace(/-+/g, '-');
+  }
+
+  nameEl.addEventListener('input', () => {
+    if (!slugManuallyEdited) {
+      slugEl.value = toSlug(nameEl.value);
+      updateSlugPreview();
+    }
+  });
+
+  slugEl.addEventListener('input', () => {
+    slugManuallyEdited = true;
+    slugEl.value = toSlug(slugEl.value);
+    updateSlugPreview();
+  });
+
+  function updateSlugPreview() {
+    const slug = slugEl.value;
+    if (slug) {
+      preview.textContent = 'cablytics.onrender.com/v2/dashboard/' + slug;
+      preview.classList.add('active');
+    } else {
+      preview.textContent = 'cablytics.onrender.com/v2/dashboard/…';
+      preview.classList.remove('active');
+    }
+  }
+
+  urlsEl.addEventListener('input', () => {
+    const lines = urlsEl.value.split('\n').filter(l => l.trim().length > 0);
+    urlCount.textContent = lines.length + (lines.length === 1 ? ' URL' : ' URLs');
+  });
+
+  reviewsEl.addEventListener('input', () => {
+    const len = reviewsEl.value.length;
+    reviewCounter.textContent = len.toLocaleString() + ' chars';
+    reviewCounter.classList.toggle('warn', len > 8000 && len <= 12000);
+    reviewCounter.classList.toggle('full', len > 12000);
+  });
+
+  function updateScheduleDay() {
+    const freq  = document.getElementById('report_frequency').value;
+    const label = document.getElementById('schedule_day_label');
+    const sel   = document.getElementById('schedule_day');
+    if (freq === 'weekly') {
+      label.textContent = 'Day of week';
+      sel.innerHTML = `
+        <option value="mon">Monday</option>
+        <option value="tue">Tuesday</option>
+        <option value="wed">Wednesday</option>
+        <option value="thu">Thursday</option>
+        <option value="fri">Friday</option>
+      `;
+    } else {
+      label.textContent = 'Day of month';
+      sel.innerHTML = `
+        <option value="1">1st</option>
+        <option value="8">8th</option>
+        <option value="15">15th</option>
+        <option value="22">22nd</option>
+      `;
+    }
+  }
+
+  document.getElementById('onboard-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const required = ['client_name', 'client_slug', 'ga4_property_id'];
+    const missing = required.filter(id => !document.getElementById(id).value.trim());
+    if (missing.length) {
+      showFlash('error', 'Please fill in all required fields: ' + missing.map(id => id.replace(/_/g, ' ')).join(', ') + '.');
+      return;
+    }
+
+    submitBtn.textContent = 'Registering…';
+    submitBtn.disabled = true;
+    submitNote.textContent = '';
+
+    const payload = {
+      client_name:        document.getElementById('client_name').value.trim(),
+      client_slug:        document.getElementById('client_slug').value.trim(),
+      ga4_property_id:    document.getElementById('ga4_property_id').value.trim(),
+      client_context:     document.getElementById('client_context').value.trim(),
+      target_urls:        document.getElementById('target_urls').value.trim(),
+      customer_reviews:   document.getElementById('customer_reviews').value.trim(),
+      competitor_notes:   document.getElementById('competitor_notes').value.trim(),
+      current_pdp_copy:   document.getElementById('current_pdp_copy').value.trim(),
+      monthly_traffic:    parseInt(document.getElementById('monthly_traffic').value) || null,
+      dev_hours_per_week: parseInt(document.getElementById('dev_hours_per_week').value) || null,
+      report_frequency:   document.getElementById('report_frequency').value,
+      schedule_day:       document.getElementById('schedule_day').value,
+      run_now:            document.getElementById('run_now').value === 'yes',
+    };
+
+    try {
+      const res = await fetch('/v2/client/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        showFlash('success', `Client "${payload.client_name}" registered. Dashboard: /v2/dashboard/${payload.client_slug}${payload.run_now ? ' — first report triggered.' : ''}`);
+        document.getElementById('onboard-form').reset();
+        slugManuallyEdited = false;
+        preview.textContent = 'cablytics.onrender.com/v2/dashboard/…';
+        preview.classList.remove('active');
+        urlCount.textContent = '0 URLs';
+        reviewCounter.textContent = '0 chars';
+        submitNote.textContent = 'Client saved successfully';
+      } else {
+        showFlash('error', data.error || 'Something went wrong. Check the Render logs.');
+      }
+    } catch (err) {
+      showFlash('error', 'Network error — is the server running?');
+    }
+
+    submitBtn.textContent = 'Register client →';
+    submitBtn.disabled = false;
+  });
+
+  function showFlash(type, msg) {
+    flash.className = 'flash ' + type + ' show';
+    flash.textContent = msg;
+    flash.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    setTimeout(() => flash.classList.remove('show'), 8000);
+  }
+</script>
+</body>
+</html>
