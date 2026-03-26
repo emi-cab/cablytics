@@ -104,6 +104,7 @@ def _init_postgres():
                     ga4_property_id     TEXT NOT NULL,
                     client_context      TEXT,
                     target_urls         TEXT,
+                    session_insights    TEXT,
                     customer_reviews    TEXT,
                     competitor_notes    TEXT,
                     current_pdp_copy    TEXT,
@@ -153,6 +154,7 @@ def _init_sqlite():
                 ga4_property_id     TEXT NOT NULL,
                 client_context      TEXT,
                 target_urls         TEXT,
+                session_insights    TEXT,
                 customer_reviews    TEXT,
                 competitor_notes    TEXT,
                 current_pdp_copy    TEXT,
@@ -249,7 +251,7 @@ def update_client(client_slug: str, data: dict) -> dict | None:
     allowed = {
         "client_name", "ga4_property_id", "client_context", "target_urls",
         "customer_reviews", "competitor_notes", "current_pdp_copy",
-        "monthly_traffic", "dev_hours_per_week", "report_frequency", "schedule_day"
+        "monthly_traffic", "dev_hours_per_week", "report_frequency", "schedule_day", "session_insights"
     }
     updates = {k: v for k, v in data.items() if k in allowed}
     if not updates:
