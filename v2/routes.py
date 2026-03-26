@@ -281,9 +281,6 @@ def admin_clients():
     return render_template("admin_clients.html",
                            clients=clients,
                            reports_by_slug=reports_by_slug)
-  return render_template("admin_clients.html",
-                           clients=clients,
-                           reports_by_slug=reports_by_slug)
 
 @v2.route("/admin/edit/<slug>")
 def admin_edit(slug):
