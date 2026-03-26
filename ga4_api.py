@@ -196,8 +196,28 @@ def run_ga4_report(client, property_id, dimensions, metrics, start_date, end_dat
         limit=limit
     )
 
+    # Always exclude Shopify Web Pixel sandbox paths — these are not real page views
+    pixel_exclusion = FilterExpression(
+        not_expression=FilterExpression(
+            filter=Filter(
+                field_name="pagePath",
+                string_filter=Filter.StringFilter(
+                    match_type=Filter.StringFilter.MatchType.CONTAINS,
+                    value="web-pixels",
+                    case_sensitive=False
+                )
+            )
+        )
+    )
+
     if url_filter is not None:
-        kwargs['dimension_filter'] = url_filter
+        kwargs['dimension_filter'] = FilterExpression(
+            and_group=FilterExpressionList(
+                expressions=[url_filter, pixel_exclusion]
+            )
+        )
+    else:
+        kwargs['dimension_filter'] = pixel_exclusion
 
     request_params = RunReportRequest(**kwargs)
     response = client.run_report(request_params)
