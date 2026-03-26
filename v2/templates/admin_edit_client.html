@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Edit {{ client.client_name }} — CABlytics</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --ink:       #0f0f10;
+      --ink-2:     #3a3a3f;
+      --ink-3:     #7a7a85;
+      --surface:   #f7f7f5;
+      --surface-2: #efefec;
+      --border:    #ddddd8;
+      --accent:    #1a1a2e;
+      --accent-2:  #e63946;
+      --mono:      'DM Mono', monospace;
+      --sans:      'DM Sans', sans-serif;
+      --radius:    6px;
+      --transition: 180ms ease;
+    }
+
+    html { font-size: 15px; }
+
+    body {
+      font-family: var(--sans);
+      background: var(--surface);
+      color: var(--ink);
+      min-height: 100vh;
+      padding: 0 0 80px;
+    }
+
+    .header {
+      background: var(--accent);
+      padding: 0 48px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .header a {
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      color: rgba(255,255,255,0.5);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      text-decoration: none;
+    }
+    .header a:hover { color: rgba(255,255,255,0.8); }
+    .header-sep { color: rgba(255,255,255,0.2); font-size: 0.85rem; }
+    .header-current { font-size: 0.85rem; color: #fff; }
+
+    .page {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 52px 32px 0;
+    }
+
+    .page-title {
+      font-size: 1.75rem;
+      font-weight: 300;
+      color: var(--ink);
+      letter-spacing: -0.02em;
+      margin-bottom: 6px;
+    }
+    .page-title span { font-weight: 500; }
+
+    .page-desc {
+      font-size: 0.875rem;
+      color: var(--ink-3);
+      margin-bottom: 44px;
+      line-height: 1.6;
+    }
+
+    .section { margin-bottom: 44px; }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .section-num {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--accent-2);
+      background: #fdf0f1;
+      border: 1px solid #f5c6ca;
+      padding: 2px 8px;
+      border-radius: 20px;
+      flex-shrink: 0;
+    }
+    .section-title {
+      font-size: 0.95rem;
+      font-weight: 500;
+      color: var(--ink);
+    }
+    .section-note {
+      margin-left: auto;
+      font-size: 0.75rem;
+      color: var(--ink-3);
+      font-family: var(--mono);
+    }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+    .field { display: flex; flex-direction: column; gap: 5px; }
+
+    label {
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: var(--ink-2);
+      letter-spacing: 0.01em;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    label .hint {
+      font-weight: 400;
+      color: var(--ink-3);
+      font-size: 0.73rem;
+      margin-left: auto;
+    }
+
+    input[type="text"],
+    input[type="number"],
+    select,
+    textarea {
+      font-family: var(--sans);
+      font-size: 0.875rem;
+      color: var(--ink);
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 9px 12px;
+      outline: none;
+      transition: border-color var(--transition), box-shadow var(--transition);
+      width: 100%;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(26,26,46,0.08);
+    }
+    input::placeholder, textarea::placeholder { color: #bbbbb5; }
+    textarea { resize: vertical; line-height: 1.55; }
+
+    select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%237a7a85' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 34px;
+      cursor: pointer;
+    }
+
+    .field-meta {
+      font-size: 0.73rem;
+      color: var(--ink-3);
+      font-family: var(--mono);
+      margin-top: 3px;
+    }
+
+    .char-counter {
+      text-align: right;
+      font-size: 0.7rem;
+      font-family: var(--mono);
+      color: var(--ink-3);
+    }
+    .char-counter.warn { color: #f59e0b; }
+    .char-counter.full { color: var(--accent-2); }
+
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 8px 0 16px;
+    }
+
+    .submit-area {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding-top: 8px;
+    }
+
+    .btn-primary {
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      color: #fff;
+      background: var(--accent);
+      border: none;
+      border-radius: var(--radius);
+      padding: 11px 28px;
+      cursor: pointer;
+      transition: background var(--transition), transform 80ms ease;
+    }
+    .btn-primary:hover { background: #2a2a4a; }
+    .btn-primary:active { transform: scale(0.98); }
+
+    .btn-secondary {
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      color: var(--ink-3);
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 20px;
+      cursor: pointer;
+      transition: border-color var(--transition), color var(--transition);
+      text-decoration: none;
+    }
+    .btn-secondary:hover { border-color: var(--ink-3); color: var(--ink); }
+
+    .submit-note {
+      font-size: 0.75rem;
+      color: var(--ink-3);
+      margin-left: auto;
+      font-family: var(--mono);
+    }
+
+    .flash {
+      padding: 12px 16px;
+      border-radius: var(--radius);
+      font-size: 0.85rem;
+      margin-bottom: 28px;
+      display: none;
+    }
+    .flash.success { background: #ecfdf5; border: 1px solid #6ee7b7; color: #065f46; }
+    .flash.error   { background: #fef2f2; border: 1px solid #fca5a5; color: #991b1b; }
+    .flash.show    { display: block; }
+
+    .slug-display {
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      color: var(--ink-3);
+      margin-top: 3px;
+    }
+    .slug-display a { color: var(--accent); text-decoration: none; }
+    .slug-display a:hover { text-decoration: underline; }
+
+    @media (max-width: 620px) {
+      .header { padding: 0 20px; }
+      .page { padding: 36px 20px 0; }
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <a href="/v2/admin/clients">CABlytics</a>
+  <span class="header-sep">/</span>
+  <a href="/v2/admin/clients">Clients</a>
+  <span class="header-sep">/</span>
+  <span class="header-current">{{ client.client_name }}</span>
+</header>
+
+<main class="page">
+  <h1 class="page-title">Edit <span>{{ client.client_name }}</span></h1>
+  <p class="page-desc">Update client settings, target URLs, consumer research inputs, or scheduling. Changes take effect on the next report run.</p>
+
+  <div id="flash" class="flash"></div>
+
+  <form id="edit-form" novalidate>
+
+    <!-- 1. Identity -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-num">01</span>
+        <span class="section-title">Client identity</span>
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label for="client_name">Client name</label>
+          <input type="text" id="client_name" name="client_name" value="{{ client.client_name }}" required>
+        </div>
+        <div class="field">
+          <label for="ga4_property_id">GA4 property ID</label>
+          <input type="text" id="ga4_property_id" name="ga4_property_id" value="{{ client.ga4_property_id }}" required>
+        </div>
+        <div class="field" style="grid-column: span 2">
+          <label for="client_context">Business context <span class="hint">used in all AI prompts</span></label>
+          <input type="text" id="client_context" name="client_context" value="{{ client.client_context or '' }}">
+          <div class="slug-display">
+            Dashboard: <a href="/v2/dashboard/{{ client.client_slug }}">/v2/dashboard/{{ client.client_slug }}</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. GA4 scope -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-num">02</span>
+        <span class="section-title">GA4 scope</span>
+        <span class="section-note">3–5 URLs recommended</span>
+      </div>
+      <div class="field">
+        <label for="target_urls">Target URLs <span class="hint">one per line</span></label>
+        <textarea id="target_urls" name="target_urls" rows="5">{{ client.target_urls or '' }}</textarea>
+        <div class="field-meta" id="url-count">{{ client.target_urls.split('\n') | selectattr('strip') | list | length if client.target_urls else 0 }} URLs</div>
+      </div>
+    </div>
+
+    <!-- 3. Consumer research -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-num">03</span>
+        <span class="section-title">Consumer research inputs</span>
+        <span class="section-note">Agent 3 data</span>
+      </div>
+      <div class="field" style="margin-bottom:16px">
+        <label for="customer_reviews">Customer reviews <span class="hint">100–300 reviews, plain text</span></label>
+        <textarea id="customer_reviews" name="customer_reviews" rows="8">{{ client.customer_reviews or '' }}</textarea>
+        <div class="char-counter" id="reviews-counter">{{ (client.customer_reviews or '') | length }} chars</div>
+      </div>
+      <div class="field" style="margin-bottom:16px">
+        <label for="competitor_notes">Competitor notes <span class="hint">optional</span></label>
+        <textarea id="competitor_notes" name="competitor_notes" rows="4">{{ client.competitor_notes or '' }}</textarea>
+      </div>
+      <div class="field">
+        <label for="current_pdp_copy">Current PDP / homepage copy <span class="hint">headline + first paragraph</span></label>
+        <textarea id="current_pdp_copy" name="current_pdp_copy" rows="4">{{ client.current_pdp_copy or '' }}</textarea>
+      </div>
+    </div>
+
+    <!-- 4. Test sizing -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-num">04</span>
+        <span class="section-title">Test sizing</span>
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label for="monthly_traffic">Monthly sessions</label>
+          <input type="number" id="monthly_traffic" name="monthly_traffic" value="{{ client.monthly_traffic or '' }}" min="0">
+        </div>
+        <div class="field">
+          <label for="dev_hours_per_week">Dev hours / week</label>
+          <input type="number" id="dev_hours_per_week" name="dev_hours_per_week" value="{{ client.dev_hours_per_week or '' }}" min="0" max="168">
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. Schedule -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-num">05</span>
+        <span class="section-title">Report schedule</span>
+      </div>
+      <div class="grid-3">
+        <div class="field">
+          <label for="report_frequency">Frequency</label>
+          <select id="report_frequency" name="report_frequency" onchange="updateScheduleDay()">
+            <option value="weekly" {{ 'selected' if client.report_frequency == 'weekly' }}>Weekly</option>
+            <option value="monthly" {{ 'selected' if client.report_frequency == 'monthly' }}>Monthly</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="schedule_day" id="schedule_day_label">
+            {{ 'Day of week' if client.report_frequency == 'weekly' else 'Day of month' }}
+          </label>
+          <select id="schedule_day" name="schedule_day">
+            {% if client.report_frequency == 'weekly' %}
+              <option value="mon" {{ 'selected' if client.schedule_day == 'mon' }}>Monday</option>
+              <option value="tue" {{ 'selected' if client.schedule_day == 'tue' }}>Tuesday</option>
+              <option value="wed" {{ 'selected' if client.schedule_day == 'wed' }}>Wednesday</option>
+              <option value="thu" {{ 'selected' if client.schedule_day == 'thu' }}>Thursday</option>
+              <option value="fri" {{ 'selected' if client.schedule_day == 'fri' }}>Friday</option>
+            {% else %}
+              <option value="1"  {{ 'selected' if client.schedule_day == '1' }}>1st</option>
+              <option value="8"  {{ 'selected' if client.schedule_day == '8' }}>8th</option>
+              <option value="15" {{ 'selected' if client.schedule_day == '15' }}>15th</option>
+              <option value="22" {{ 'selected' if client.schedule_day == '22' }}>22nd</option>
+            {% endif %}
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Submit -->
+    <div class="section">
+      <div class="divider"></div>
+      <div class="submit-area">
+        <button type="submit" class="btn-primary" id="submit-btn">Save changes →</button>
+        <a href="/v2/dashboard/{{ client.client_slug }}" class="btn-secondary">View dashboard</a>
+        <a href="/v2/admin/clients" class="btn-secondary">All clients</a>
+        <span class="submit-note" id="submit-note"></span>
+      </div>
+    </div>
+
+  </form>
+</main>
+
+<script>
+  const urlsEl      = document.getElementById('target_urls');
+  const urlCount    = document.getElementById('url-count');
+  const reviewsEl   = document.getElementById('customer_reviews');
+  const reviewCount = document.getElementById('reviews-counter');
+  const flash       = document.getElementById('flash');
+  const submitBtn   = document.getElementById('submit-btn');
+  const submitNote  = document.getElementById('submit-note');
+
+  urlsEl.addEventListener('input', () => {
+    const lines = urlsEl.value.split('\n').filter(l => l.trim().length > 0);
+    urlCount.textContent = lines.length + (lines.length === 1 ? ' URL' : ' URLs');
+  });
+
+  reviewsEl.addEventListener('input', () => {
+    const len = reviewsEl.value.length;
+    reviewCount.textContent = len.toLocaleString() + ' chars';
+    reviewCount.classList.toggle('warn', len > 8000 && len <= 12000);
+    reviewCount.classList.toggle('full', len > 12000);
+  });
+
+  function updateScheduleDay() {
+    const freq  = document.getElementById('report_frequency').value;
+    const label = document.getElementById('schedule_day_label');
+    const sel   = document.getElementById('schedule_day');
+    if (freq === 'weekly') {
+      label.textContent = 'Day of week';
+      sel.innerHTML = `
+        <option value="mon">Monday</option>
+        <option value="tue">Tuesday</option>
+        <option value="wed">Wednesday</option>
+        <option value="thu">Thursday</option>
+        <option value="fri">Friday</option>
+      `;
+    } else {
+      label.textContent = 'Day of month';
+      sel.innerHTML = `
+        <option value="1">1st</option>
+        <option value="8">8th</option>
+        <option value="15">15th</option>
+        <option value="22">22nd</option>
+      `;
+    }
+  }
+
+  document.getElementById('edit-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    submitBtn.textContent = 'Saving…';
+    submitBtn.disabled = true;
+
+    const payload = {
+      client_name:        document.getElementById('client_name').value.trim(),
+      ga4_property_id:    document.getElementById('ga4_property_id').value.trim(),
+      client_context:     document.getElementById('client_context').value.trim(),
+      target_urls:        document.getElementById('target_urls').value.trim(),
+      customer_reviews:   document.getElementById('customer_reviews').value.trim(),
+      competitor_notes:   document.getElementById('competitor_notes').value.trim(),
+      current_pdp_copy:   document.getElementById('current_pdp_copy').value.trim(),
+      monthly_traffic:    parseInt(document.getElementById('monthly_traffic').value) || null,
+      dev_hours_per_week: parseInt(document.getElementById('dev_hours_per_week').value) || null,
+      report_frequency:   document.getElementById('report_frequency').value,
+      schedule_day:       document.getElementById('schedule_day').value,
+    };
+
+    try {
+      const res = await fetch('/v2/client/{{ client.client_slug }}/reviews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        showFlash('success', 'Changes saved. Re-run the report to apply them.');
+        submitNote.textContent = 'Saved';
+      } else {
+        showFlash('error', data.error || 'Something went wrong.');
+      }
+    } catch (err) {
+      showFlash('error', 'Network error — is the server running?');
+    }
+
+    submitBtn.textContent = 'Save changes →';
+    submitBtn.disabled = false;
+  });
+
+  function showFlash(type, msg) {
+    flash.className = 'flash ' + type + ' show';
+    flash.textContent = msg;
+    flash.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    setTimeout(() => flash.classList.remove('show'), 8000);
+  }
+</script>
+</body>
+</html>
