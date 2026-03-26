@@ -621,7 +621,7 @@
 {% set is_running = active_run and active_run.get('status') in ['pending', 'running'] %}
 
 <header class="header">
-  <span class="header-logo">CABlytics</span>
+  <a href="/v2/admin/clients" style="font-family:var(--mono);font-size:0.85rem;font-weight:500;color:rgba(255,255,255,0.5);letter-spacing:0.06em;text-transform:uppercase;text-decoration:none;">CABlytics</a>
   <span class="header-sep">/</span>
   <span class="header-client">{{ client.client_name }}</span>
   <div class="header-actions">
