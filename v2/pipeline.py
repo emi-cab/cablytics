@@ -90,6 +90,7 @@ def run_agent1(client_data: dict, report_id: int) -> dict:
     property_id = client_data["ga4_property_id"]
     urls_raw    = client_data.get("target_urls", "")
     context     = client_data.get("client_context", "")
+    session_insights = client_data.get("session_insights", "")
 
     urls = [u.strip() for u in urls_raw.split("\n") if u.strip()] if urls_raw else []
 
@@ -100,7 +101,7 @@ def run_agent1(client_data: dict, report_id: int) -> dict:
 
     log_event(client_id, "agent_started", report_id=report_id, agent_number=1, message="Calling Claude API")
 
-    system, user = agent1_prompt(funnel_summary, context)
+    system, user = agent1_prompt(funnel_summary, context, session_insights)
     output = _call_claude(system, user, agent_num=1)
 
     update_report_agent(report_id, 1, output)
