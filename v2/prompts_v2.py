@@ -12,7 +12,7 @@ after each API call, not here.
 
 # ── Agent 1: Funnel Analyst ────────────────────────────────────────────────────
 
-def agent1_prompt(funnel_summary: str, client_context: str) -> tuple[str, str]:
+def agent1_prompt(funnel_summary: str, client_context: str, session_insights: str = '') -> tuple[str, str]:
     system = """You are a senior CRO analyst specialising in e-commerce funnel analysis.
 You receive GA4 data and identify exactly where revenue is leaking — pages or steps where
 drop-off is disproportionate to traffic volume.
@@ -80,6 +80,9 @@ BUSINESS CONTEXT:
 
 GA4 DATA:
 {funnel_summary}
+
+SESSION RECORDING INSIGHTS:
+{session_insights or 'No session recording data provided.'}
 
 Identify the 3 biggest revenue leaks. For each leak, give the mobile vs desktop breakdown
 where the data supports it. The mobile/desktop conversion ratio is the most important signal —
