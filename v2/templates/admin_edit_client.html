@@ -312,6 +312,19 @@
         <div class="field-meta" id="url-count">{{ client.target_urls.split('\n') | selectattr('strip') | list | length if client.target_urls else 0 }} URLs</div>
       </div>
     </div>
+    
+    <!-- Session insights -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-num">03</span>
+        <span class="section-title">Session recording insights</span>
+        <span class="section-note">Clarity Copilot / Hotjar observations</span>
+      </div>
+      <div class="field">
+        <label for="session_insights">Session insights <span class="hint">paste Clarity AI summary or manual observations</span></label>
+        <textarea id="session_insights" name="session_insights" rows="6" placeholder="e.g. 70% of mobile users rage-click the membership CTA on the homepage. Dead clicks on the nav menu on /find-a-gym. Users drop off at the gym selector step on mobile. Average scroll depth on /classes is 42%.">{{ client.session_insights or '' }}</textarea>
+      </div>
+    </div>
 
     <!-- 3. Consumer research -->
     <div class="section">
