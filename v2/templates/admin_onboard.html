@@ -364,7 +364,20 @@
       </div>
     </div>
 
-    <!-- 3. Consumer research inputs -->
+    <!-- 3. Session insights -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-num">03</span>
+        <span class="section-title">Session recording insights</span>
+        <span class="section-note">Clarity Copilot / Hotjar observations</span>
+      </div>
+      <div class="field">
+        <label for="session_insights">Session insights <span class="hint">paste Clarity AI summary or manual observations</span></label>
+        <textarea id="session_insights" name="session_insights" rows="6" placeholder="e.g. 70% of mobile users rage-click the membership CTA on the homepage. Dead clicks on the nav menu on /find-a-gym. Users drop off at the gym selector step on mobile. Average scroll depth on /classes is 42%.">{{ client.session_insights or '' }}</textarea>
+      </div>
+    </div>
+
+    <!-- 4. Consumer research inputs -->
     <div class="section">
       <div class="section-header">
         <span class="section-num">03</span>
@@ -386,7 +399,7 @@
       </div>
     </div>
 
-    <!-- 4. Test sizing -->
+    <!-- 5. Test sizing -->
     <div class="section">
       <div class="section-header">
         <span class="section-num">04</span>
@@ -405,7 +418,7 @@
       </div>
     </div>
 
-    <!-- 5. Schedule -->
+    <!-- 6. Schedule -->
     <div class="section">
       <div class="section-header">
         <span class="section-num">05</span>
@@ -438,7 +451,7 @@
       </div>
     </div>
 
-    <!-- 6. Submit -->
+    <!-- 7. Submit -->
     <div class="section">
       <div class="divider"></div>
       <div class="submit-area">
@@ -551,6 +564,7 @@
       client_name:        document.getElementById('client_name').value.trim(),
       client_slug:        document.getElementById('client_slug').value.trim(),
       ga4_property_id:    document.getElementById('ga4_property_id').value.trim(),
+      session_insights:   document.getElementById('session_insights').value.trim(),
       client_context:     document.getElementById('client_context').value.trim(),
       target_urls:        document.getElementById('target_urls').value.trim(),
       customer_reviews:   document.getElementById('customer_reviews').value.trim(),
