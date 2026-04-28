@@ -1,26 +1,20 @@
 """
 Agent prompt templates for CABlytics V2.
 
-Each function returns a (system_prompt, user_prompt) tuple ready to pass
-to the Claude API. All prompts request JSON output — no markdown, no prose
-wrappers — so the pipeline can parse and store outputs directly.
+Each function returns prompts ready for the Claude API. JSON sanitisation
+(ensure_ascii, regex cleaning) is applied in pipeline.py after each call.
 
-JSON sanitisation (ensure_ascii, regex cleaning) is applied in pipeline.py
-after each API call, not here.
-
-Phase 2 changes:
-  • Agent 1 now receives the list of page assets so it can map URLs back
-    to page types in its analysis (homepage, PLP, PDP, cart, checkout, etc.).
-  • _format_page_assets_for_agent1 is a thin formatter — only includes type +
-    label + URL (not copy), since Agent 1 cares about type/URL mapping, not
-    copy. Agent 3 and 4 still consume copy-rich page asset blocks.
+Phase 3 changes:
+  • agent4_prompt now returns a content-blocks list as the user prompt when
+    screenshots are present, so Claude's vision can analyse the screenshots.
+    When no screenshots exist, it returns a plain string user prompt as before.
+  • Other agents unchanged.
 """
 
 
 # ── Agent 1: Funnel Analyst ────────────────────────────────────────────────────
 
 def _format_page_assets_for_agent1(page_assets: list[dict]) -> str:
-    """Brief mapping of URL → page type, for Agent 1's prompt."""
     if not page_assets:
         return "No page-type tagging provided — analyse all URLs site-wide."
     lines = ["URL → page type mapping (use these tags in your findings):"]
@@ -197,11 +191,6 @@ Output your ranked JSON now."""
 # ── Helper: format page assets with copy for Agents 3 and 4 ────────────────────
 
 def _format_page_assets(page_assets: list[dict]) -> str:
-    """
-    Format a list of client_page_assets rows as a labelled block for prompt
-    injection. Returns a string. Returns a placeholder string if the list is
-    empty so prompts read cleanly either way.
-    """
     if not page_assets:
         return "No page assets provided."
 
@@ -338,7 +327,16 @@ Output your JSON now."""
 # ── Agent 4: Copy Optimiser ────────────────────────────────────────────────────
 
 def agent4_prompt(agent3_output: dict, page_assets: list[dict],
-                  client_context: str) -> tuple[str, str]:
+                  client_context: str):
+    """
+    Phase 3: Returns (system_prompt, user_content) where user_content is either:
+      • a plain string when no page assets have screenshots, or
+      • a list of content blocks (text + image URLs) when screenshots are
+        present, so Claude's vision can analyse them.
+
+    Pipeline.py's _call_claude detects the type and constructs the API call
+    accordingly.
+    """
     import json
 
     system = """You are a direct-response copywriter specialising in e-commerce.
@@ -353,7 +351,11 @@ The three headline formulas that consistently outperform:
 2. Say what you get — "Wake Up Energised. Stay Focused All Day." (outcome-first)
 3. Say what you're able to do — "Finally Deadlift Without Lower Back Pain" (removes a blocker)
 
-You receive multiple tagged page versions (homepage, PLP, PDP, cart, checkout, etc.).
+You receive multiple tagged page versions. Some pages may include a SCREENSHOT — when present,
+use it to comment on visual hierarchy, CTA prominence, trust signals, layout, whitespace, and
+how prominently the value proposition is communicated. Treat the screenshot as ground truth
+for what the user actually sees, and the extracted copy as the textual content for rewriting.
+
 Pick the page where Agent 3's research points to the strongest leak, but you may
 suggest copy fixes for additional pages where the gap is obvious.
 
@@ -370,6 +372,13 @@ Your JSON must follow this exact structure:
     "url": "The page URL",
     "rationale": "One sentence on why this page was chosen as the primary focus"
   },
+  "visual_observations": [
+    {
+      "page_type": "Which page",
+      "observation": "One specific visual finding (CTA buried below fold, hero image lacks human face, trust badges absent, etc.)",
+      "impact": "How this affects conversion"
+    }
+  ],
   "headline_variants": [
     {
       "formula": "say_what_it_is|say_what_you_get|say_what_you_can_do",
@@ -389,7 +398,7 @@ Your JSON must follow this exact structure:
     {
       "page_type": "Which other page",
       "page_label": "Its label",
-      "specific_change": "One concrete copy change to make",
+      "specific_change": "One concrete copy or visual change to make",
       "rationale": "Why this change addresses a CEP or objection"
     }
   ],
@@ -404,11 +413,14 @@ Your JSON must follow this exact structure:
   "words_to_remove": ["List of vague or off-CEP words currently in the copy"],
   "words_to_add": ["List of specific customer language phrases from the research"],
   "summary": "2-3 sentence plain English summary of the copy strategy."
-}"""
+}
+
+If no screenshots are provided, omit the visual_observations array (or make it empty).
+"""
 
     pages_block = _format_page_assets(page_assets)
 
-    user = f"""Rewrite the headline and primary page opening copy based on the consumer research below.
+    intro_text = f"""Rewrite the headline and primary page opening copy based on the consumer research below.
 
 BUSINESS CONTEXT:
 {client_context or 'No specific business context provided.'}
@@ -427,9 +439,42 @@ If other pages have obvious copy gaps that Agent 3 surfaced, add them under
 additional_page_suggestions — but keep that list short (max 3 items) and concrete.
 
 No vague superlatives. No fake urgency. Use the exact customer language from the research.
-Output your JSON now."""
+"""
 
-    return system, user
+    # Find page assets that have screenshots
+    assets_with_images = [a for a in (page_assets or []) if a.get("screenshot_url")]
+
+    if not assets_with_images:
+        # Plain string user prompt — no images
+        user_content = intro_text + "\nOutput your JSON now."
+        return system, user_content
+
+    # Build content-blocks message: intro text, then each image with a label,
+    # then closing instructions.
+    blocks = [{"type": "text", "text": intro_text}]
+
+    for a in assets_with_images:
+        page_type = (a.get("page_type") or "other").upper()
+        label     = a.get("page_label") or "Untitled"
+        url       = a.get("screenshot_url")
+
+        blocks.append({
+            "type": "text",
+            "text": f"\nSCREENSHOT — {page_type} ({label}):"
+        })
+        blocks.append({
+            "type": "image",
+            "source": {"type": "url", "url": url},
+        })
+
+    blocks.append({
+        "type": "text",
+        "text": "\nUse the screenshots to populate visual_observations with 2-4 concrete "
+                "findings. Then proceed with headline_variants, page_opening_rewrite, and "
+                "the rest of the JSON. Output your JSON now."
+    })
+
+    return system, blocks
 
 
 # ── Agent 5: Test Prioritiser ──────────────────────────────────────────────────

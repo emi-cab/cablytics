@@ -1,25 +1,32 @@
 """
 CABlytics V2 — Flask routes.
 
-Endpoints:
-  POST /v2/client/create                       Register a new client
-  POST /v2/client/<slug>/reviews               Update client config
-  GET  /v2/client/<slug>                       Get client config (admin use)
-  GET  /v2/clients                             List all clients (admin use)
-  POST /v2/report/run                          Trigger a manual report run
-  GET  /v2/report/<slug>                       Get latest completed report JSON
-  GET  /v2/report/<slug>/status                Get current run status
-  GET  /v2/dashboard/<slug>                    Serve the client dashboard HTML
-  GET  /v2/admin/onboard                       Serve the admin onboarding form
-  GET  /v2/admin/clients                       Serve the admin client list page
-  GET  /v2/admin/edit/<slug>                   Serve the admin edit-client page
-  GET  /v2/health                              V2-specific health check
+Endpoints (Phase 3):
+  POST   /v2/client/create
+  POST   /v2/client/<slug>/reviews
+  GET    /v2/client/<slug>
+  GET    /v2/clients
 
-  Phase 2 — page assets CRUD:
-  GET    /v2/client/<slug>/page-assets         List page assets for a client (JSON)
-  POST   /v2/client/<slug>/page-assets         Create a new page asset
-  PATCH  /v2/page-assets/<asset_id>            Update an existing page asset
-  DELETE /v2/page-assets/<asset_id>            Delete a page asset
+  Page assets:
+  GET    /v2/client/<slug>/page-assets
+  POST   /v2/client/<slug>/page-assets
+  PATCH  /v2/page-assets/<asset_id>
+  DELETE /v2/page-assets/<asset_id>
+  POST   /v2/page-assets/<asset_id>/screenshot   ← new in Phase 3
+
+  Reports:
+  POST   /v2/report/run
+  GET    /v2/report/<slug>
+  GET    /v2/report/<slug>/status
+
+  Pages (HTML):
+  GET    /v2/dashboard/<slug>
+  GET    /v2/admin/onboard
+  GET    /v2/admin/clients
+  GET    /v2/admin/edit/<slug>
+
+  Health:
+  GET    /v2/health
 """
 
 import threading
@@ -45,11 +52,17 @@ from v2.db import (
 )
 from v2.pipeline import run_pipeline
 from v2.scheduler import register_client_job
+from v2.storage import (
+    upload_screenshot,
+    public_url_for_path,
+    is_configured as storage_is_configured,
+    ALLOWED_MIME_TYPES,
+    MAX_UPLOAD_BYTES,
+)
 
 v2 = Blueprint("v2", __name__, url_prefix="/v2",
                template_folder="templates")
 
-# Initialise DB tables on blueprint load
 init_db()
 
 
@@ -65,11 +78,27 @@ def _strip_sensitive(client_dict: dict) -> dict:
     return {k: v for k, v in client_dict.items() if k not in SENSITIVE_FIELDS}
 
 
+def _enrich_asset(asset: dict) -> dict:
+    """Add the public screenshot URL alongside the storage path so the UI can render it."""
+    if not asset:
+        return asset
+    out = dict(asset)
+    if asset.get("screenshot_path"):
+        out["screenshot_url"] = public_url_for_path(asset["screenshot_path"])
+    else:
+        out["screenshot_url"] = None
+    return out
+
+
 # ── Health ─────────────────────────────────────────────────────────────────────
 
 @v2.route("/health")
 def health():
-    return jsonify({"status": "healthy", "version": "2"})
+    return jsonify({
+        "status": "healthy",
+        "version": "2",
+        "storage_configured": storage_is_configured(),
+    })
 
 
 # ── Client management ──────────────────────────────────────────────────────────
@@ -163,25 +192,23 @@ def clients_list():
     return jsonify([_strip_sensitive(c) for c in clients])
 
 
-# ── Page assets (Phase 2) ──────────────────────────────────────────────────────
+# ── Page assets ────────────────────────────────────────────────────────────────
 
 @v2.route("/client/<slug>/page-assets", methods=["GET"])
 def page_assets_list(slug):
-    """List all page assets for a client."""
     client = get_client_by_slug(slug)
     if not client:
         return jsonify({"error": "Client not found"}), 404
     assets = list_page_assets(client["id"])
     return jsonify({
         "client_slug": slug,
-        "page_assets": assets,
+        "page_assets": [_enrich_asset(a) for a in assets],
         "valid_page_types": sorted(VALID_PAGE_TYPES),
     })
 
 
 @v2.route("/client/<slug>/page-assets", methods=["POST"])
 def page_assets_create(slug):
-    """Create a new page asset for a client."""
     client = get_client_by_slug(slug)
     if not client:
         return jsonify({"error": "Client not found"}), 404
@@ -199,12 +226,11 @@ def page_assets_create(slug):
         }), 400
 
     asset = create_page_asset(client["id"], data)
-    return jsonify({"success": True, "asset": asset}), 201
+    return jsonify({"success": True, "asset": _enrich_asset(asset)}), 201
 
 
 @v2.route("/page-assets/<int:asset_id>", methods=["PATCH"])
 def page_assets_update(asset_id):
-    """Update an existing page asset."""
     existing = get_page_asset(asset_id)
     if not existing:
         return jsonify({"error": "Page asset not found"}), 404
@@ -217,15 +243,15 @@ def page_assets_update(asset_id):
         }), 400
 
     asset = update_page_asset(asset_id, data)
-    return jsonify({"success": True, "asset": asset})
+    return jsonify({"success": True, "asset": _enrich_asset(asset)})
 
 
 @v2.route("/page-assets/<int:asset_id>", methods=["DELETE"])
 def page_assets_delete(asset_id):
     """
-    Delete a page asset. Note: in Phase 3, the screenshot file in Supabase
-    Storage is intentionally orphaned (not deleted) to keep the code simple.
-    Storage cleanup can be done manually in Supabase if needed.
+    Delete a page asset. The screenshot file in Supabase Storage is intentionally
+    orphaned (per project decision) — it stays in the bucket but no longer
+    referenced. Storage cleanup can be done manually if needed.
     """
     existing = get_page_asset(asset_id)
     if not existing:
@@ -233,6 +259,67 @@ def page_assets_delete(asset_id):
 
     deleted = delete_page_asset(asset_id)
     return jsonify({"success": deleted, "deleted_id": asset_id})
+
+
+@v2.route("/page-assets/<int:asset_id>/screenshot", methods=["POST"])
+def page_assets_upload_screenshot(asset_id):
+    """
+    Upload a screenshot for a page asset. Multipart form-data:
+      • file (required) — the image file
+
+    Returns the updated asset including its new screenshot_url.
+    """
+    if not storage_is_configured():
+        return jsonify({
+            "error": "Storage is not configured. SUPABASE_URL and SUPABASE_SERVICE_KEY env vars must be set."
+        }), 500
+
+    asset = get_page_asset(asset_id)
+    if not asset:
+        return jsonify({"error": "Page asset not found"}), 404
+
+    client = get_client_by_id(asset["client_id"])
+    if not client:
+        return jsonify({"error": "Owning client not found"}), 404
+
+    if "file" not in request.files:
+        return jsonify({"error": "No file uploaded under field name 'file'"}), 400
+
+    upload = request.files["file"]
+    if not upload or not upload.filename:
+        return jsonify({"error": "Empty upload"}), 400
+
+    file_bytes = upload.read()
+    content_type = (upload.mimetype or "").lower()
+    if content_type == "image/jpg":
+        content_type = "image/jpeg"
+
+    if content_type not in ALLOWED_MIME_TYPES:
+        return jsonify({
+            "error": f"Unsupported file type: {content_type or 'unknown'}. "
+                     f"Allowed: {', '.join(sorted(ALLOWED_MIME_TYPES))}"
+        }), 400
+
+    if len(file_bytes) > MAX_UPLOAD_BYTES:
+        return jsonify({
+            "error": f"File too large ({len(file_bytes) // 1024} KB). "
+                     f"Maximum is {MAX_UPLOAD_BYTES // 1024 // 1024}MB."
+        }), 400
+
+    try:
+        storage_path = upload_screenshot(
+            client_slug=client["client_slug"],
+            asset_id=asset_id,
+            file_bytes=file_bytes,
+            content_type=content_type,
+        )
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except RuntimeError as e:
+        return jsonify({"error": f"Upload to storage failed: {str(e)}"}), 502
+
+    updated = update_page_asset(asset_id, {"screenshot_path": storage_path})
+    return jsonify({"success": True, "asset": _enrich_asset(updated)}), 200
 
 
 # ── Report runs ────────────────────────────────────────────────────────────────
@@ -393,7 +480,7 @@ def admin_edit(slug):
     client = get_client_by_slug(slug)
     if not client:
         abort(404)
-    page_assets = list_page_assets(client["id"])
+    page_assets = [_enrich_asset(a) for a in list_page_assets(client["id"])]
     return render_template("admin_edit_client.html",
                            client=client,
                            page_assets=page_assets,

@@ -163,13 +163,6 @@
       cursor: pointer;
     }
 
-    .field-meta {
-      font-size: 0.73rem;
-      color: var(--ink-3);
-      font-family: var(--mono);
-      margin-top: 3px;
-    }
-
     .char-counter {
       text-align: right;
       font-size: 0.7rem;
@@ -179,7 +172,7 @@
     .char-counter.warn { color: #f59e0b; }
     .char-counter.full { color: var(--accent-2); }
 
-    /* ── Page assets list ─────────────────────────────────────────────── */
+    /* ── Page asset cards ─────────────────────────────────────────────── */
     .assets-empty {
       background: var(--surface-2);
       border: 1px dashed var(--border);
@@ -264,13 +257,19 @@
       word-break: break-all;
       margin-bottom: 8px;
     }
+    .asset-body {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 14px;
+      align-items: start;
+    }
+    .asset-body.no-thumb { grid-template-columns: 1fr; }
     .asset-copy-preview {
       font-size: 0.78rem;
       color: var(--ink-2);
       line-height: 1.5;
       max-height: 4.5em;
       overflow: hidden;
-      position: relative;
       white-space: pre-wrap;
     }
     .asset-copy-empty {
@@ -278,8 +277,36 @@
       color: var(--ink-3);
       font-style: italic;
     }
+    .asset-thumb {
+      width: 88px;
+      height: 88px;
+      border-radius: var(--radius);
+      object-fit: cover;
+      border: 1px solid var(--border);
+      flex-shrink: 0;
+      cursor: pointer;
+      transition: transform var(--transition);
+    }
+    .asset-thumb:hover { transform: scale(1.02); }
+    .asset-thumb-empty {
+      width: 88px;
+      height: 88px;
+      border-radius: var(--radius);
+      border: 1px dashed var(--border);
+      background: var(--surface-2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--mono);
+      font-size: 0.6rem;
+      color: var(--ink-3);
+      letter-spacing: 0.05em;
+      text-align: center;
+      padding: 4px;
+      flex-shrink: 0;
+    }
 
-    /* ── Asset edit form (shown when adding/editing) ──────────────────── */
+    /* ── Asset edit form ──────────────────────────────────────────────── */
     .asset-form {
       background: #fff;
       border: 1px solid var(--accent);
@@ -342,6 +369,86 @@
       border-style: solid;
       background: #fafafa;
     }
+
+    /* ── Screenshot uploader (inside asset form) ──────────────────────── */
+    .ss-uploader {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+      padding: 12px;
+      background: var(--surface-2);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+    }
+    .ss-preview {
+      width: 120px;
+      height: 120px;
+      border-radius: var(--radius);
+      object-fit: cover;
+      border: 1px solid var(--border);
+      background: #fff;
+      flex-shrink: 0;
+    }
+    .ss-preview-empty {
+      width: 120px;
+      height: 120px;
+      border-radius: var(--radius);
+      border: 1px dashed var(--border);
+      background: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--ink-3);
+      letter-spacing: 0.05em;
+      text-align: center;
+      padding: 8px;
+      flex-shrink: 0;
+    }
+    .ss-controls { flex: 1; min-width: 0; }
+    .ss-status {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--ink-3);
+      margin-top: 6px;
+      min-height: 16px;
+    }
+    .ss-status.uploading { color: var(--accent); }
+    .ss-status.error     { color: var(--accent-2); }
+    .ss-status.success   { color: #047857; }
+    .ss-help {
+      font-size: 0.72rem;
+      color: var(--ink-3);
+      margin-top: 6px;
+      line-height: 1.4;
+    }
+
+    .btn-upload {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: var(--ink-2);
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 6px 12px;
+      cursor: pointer;
+      transition: border-color var(--transition);
+    }
+    .btn-upload:hover { border-color: var(--ink-3); }
+    .btn-upload[disabled] { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-upload-remove {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--accent-2);
+      background: none;
+      border: 1px solid transparent;
+      cursor: pointer;
+      padding: 4px 0;
+      margin-left: 10px;
+    }
+    .btn-upload-remove:hover { text-decoration: underline; }
 
     .divider {
       height: 1px;
@@ -417,6 +524,9 @@
       .header { padding: 0 20px; }
       .page { padding: 36px 20px 0; }
       .grid-2, .grid-3 { grid-template-columns: 1fr; }
+      .asset-body { grid-template-columns: 1fr; }
+      .ss-uploader { flex-direction: column; }
+      .ss-preview, .ss-preview-empty { width: 100%; height: 160px; }
     }
   </style>
 </head>
@@ -511,7 +621,7 @@
       </div>
 
       <p class="page-desc" style="margin-bottom:18px; font-size:0.82rem">
-        Tag the key pages in this client's funnel. Agent 1 uses the URLs to filter GA4. Agent 3 and Agent 4 use the page type and copy to focus their analysis. 3–5 pages is the recommended sweet spot.
+        Tag the key pages in this client's funnel and optionally upload a screenshot of each. Agent 4 uses screenshots for visual analysis (CTA prominence, hierarchy, layout) alongside the copy. 3–5 pages is the recommended sweet spot.
       </p>
 
       <div id="asset-form-container"></div>
@@ -529,11 +639,20 @@
               </div>
             </div>
             <div class="asset-url">{{ a.url }}</div>
-            {% if a.extracted_copy %}
-              <div class="asset-copy-preview">{{ a.extracted_copy[:240] }}{% if a.extracted_copy|length > 240 %}…{% endif %}</div>
-            {% else %}
-              <div class="asset-copy-empty">No copy captured yet.</div>
-            {% endif %}
+            <div class="asset-body {% if not a.screenshot_url %}no-thumb{% endif %}">
+              <div>
+                {% if a.extracted_copy %}
+                  <div class="asset-copy-preview">{{ a.extracted_copy[:240] }}{% if a.extracted_copy|length > 240 %}…{% endif %}</div>
+                {% else %}
+                  <div class="asset-copy-empty">No copy captured yet.</div>
+                {% endif %}
+              </div>
+              {% if a.screenshot_url %}
+                <a href="{{ a.screenshot_url }}" target="_blank" rel="noopener">
+                  <img class="asset-thumb" src="{{ a.screenshot_url }}" alt="Screenshot">
+                </a>
+              {% endif %}
+            </div>
           </div>
           {% endfor %}
         {% else %}
@@ -692,6 +811,10 @@
     const copyHtml = a.extracted_copy
       ? `<div class="asset-copy-preview">${escapeHtml(a.extracted_copy.slice(0, 240))}${a.extracted_copy.length > 240 ? '…' : ''}</div>`
       : `<div class="asset-copy-empty">No copy captured yet.</div>`;
+    const thumbHtml = a.screenshot_url
+      ? `<a href="${escapeHtml(a.screenshot_url)}" target="_blank" rel="noopener"><img class="asset-thumb" src="${escapeHtml(a.screenshot_url)}" alt="Screenshot"></a>`
+      : '';
+    const bodyClass = a.screenshot_url ? '' : 'no-thumb';
     return `
       <div class="asset-card" data-asset-id="${a.id}">
         <div class="asset-card-header">
@@ -703,7 +826,10 @@
           </div>
         </div>
         <div class="asset-url">${escapeHtml(a.url)}</div>
-        ${copyHtml}
+        <div class="asset-body ${bodyClass}">
+          <div>${copyHtml}</div>
+          ${thumbHtml}
+        </div>
       </div>
     `;
   }
@@ -737,6 +863,8 @@
       return `<option value="${t}" ${sel}>${t}</option>`;
     }).join('');
 
+    const screenshotHtml = isEdit ? buildScreenshotUploader(asset) : '';
+
     return `
       <div class="asset-form" id="asset-form" data-asset-id="${isEdit ? asset.id : ''}">
         <div class="asset-form-title">${isEdit ? 'Edit page asset' : 'New page asset'}</div>
@@ -757,14 +885,40 @@
           <input type="text" id="asset-url" placeholder="e.g. /products/wide-fit-trainers or https://example.com/checkout" value="${isEdit ? escapeHtml(asset.url) : ''}">
         </div>
 
-        <div class="field">
+        <div class="field" style="margin-bottom:12px">
           <label for="asset-copy">Page copy <span class="hint">headline + first paragraph or key copy block</span></label>
           <textarea id="asset-copy" rows="5" placeholder="Paste the headline and the first paragraph, or the key copy block from this page.">${isEdit ? escapeHtml(asset.extracted_copy || '') : ''}</textarea>
         </div>
 
+        ${screenshotHtml}
+
         <div class="asset-form-actions">
           <button type="button" class="btn-asset-save" onclick="saveAsset()">${isEdit ? 'Save changes' : 'Add asset'}</button>
           <button type="button" class="btn-asset-cancel" onclick="cancelAssetForm()">Cancel</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function buildScreenshotUploader(asset) {
+    const hasShot = !!asset.screenshot_url;
+    const previewHtml = hasShot
+      ? `<img id="ss-preview" class="ss-preview" src="${escapeHtml(asset.screenshot_url)}" alt="Screenshot preview">`
+      : `<div id="ss-preview" class="ss-preview-empty">no screenshot</div>`;
+
+    return `
+      <div class="field" style="margin-bottom:12px">
+        <label>Screenshot <span class="hint">used by Agent 4 for visual analysis</span></label>
+        <div class="ss-uploader">
+          ${previewHtml}
+          <div class="ss-controls">
+            <input type="file" id="ss-file-input" accept="image/png,image/jpeg,image/webp" style="display:none">
+            <button type="button" class="btn-upload" onclick="document.getElementById('ss-file-input').click()">
+              ${hasShot ? 'Replace screenshot' : 'Upload screenshot'}
+            </button>
+            <div class="ss-status" id="ss-status"></div>
+            <div class="ss-help">PNG, JPEG, or WebP. Auto-resized to 1600px wide. Max 5MB.</div>
+          </div>
         </div>
       </div>
     `;
@@ -787,6 +941,11 @@
       }
       formContainer.innerHTML = buildAssetForm(asset);
       addBtn.style.display = 'none';
+      // Wire up the screenshot upload handler now that the input exists in DOM
+      const fileInput = document.getElementById('ss-file-input');
+      if (fileInput) {
+        fileInput.addEventListener('change', () => handleScreenshotUpload(id));
+      }
       formContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
     } catch (err) {
       showFlash('error', 'Could not load asset for editing.');
@@ -826,7 +985,7 @@
       });
       const data = await res.json();
       if (res.ok) {
-        showFlash('success', isEdit ? 'Page asset updated.' : 'Page asset added.');
+        showFlash('success', isEdit ? 'Page asset updated.' : 'Page asset added. Click Edit to upload a screenshot.');
         cancelAssetForm();
         await refreshAssets();
       } else {
@@ -851,6 +1010,101 @@
       }
     } catch (err) {
       showFlash('error', 'Network error deleting asset.');
+    }
+  }
+
+  // ── Screenshot upload + client-side compression ───────────────────────
+
+  /**
+   * Read a file into an HTMLImageElement.
+   */
+  function readImage(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = e.target.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  /**
+   * Resize an image to a maximum width while preserving aspect ratio.
+   * Returns a Blob (image/jpeg).
+   */
+  async function compressImage(file, maxWidth = 1600, quality = 0.85) {
+    const img = await readImage(file);
+    const scale = Math.min(1, maxWidth / img.width);
+    const w = Math.round(img.width  * scale);
+    const h = Math.round(img.height * scale);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, w, h);
+
+    return new Promise(resolve => {
+      // For PNG with transparency, keep PNG; otherwise JPEG for smaller size.
+      const useJpeg = file.type !== 'image/png';
+      const mime    = useJpeg ? 'image/jpeg' : 'image/png';
+      canvas.toBlob(resolve, mime, useJpeg ? quality : undefined);
+    });
+  }
+
+  async function handleScreenshotUpload(assetId) {
+    const fileInput = document.getElementById('ss-file-input');
+    const status    = document.getElementById('ss-status');
+    const file      = fileInput.files[0];
+    if (!file) return;
+
+    // Reset status
+    status.className = 'ss-status uploading';
+    status.textContent = 'Compressing…';
+
+    try {
+      const blob = await compressImage(file);
+      status.textContent = `Uploading ${(blob.size / 1024).toFixed(0)} KB…`;
+
+      const formData = new FormData();
+      formData.append('file', blob, 'screenshot.' + (blob.type === 'image/png' ? 'png' : 'jpg'));
+
+      const res = await fetch(`/v2/page-assets/${assetId}/screenshot`, {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        status.className = 'ss-status success';
+        status.textContent = 'Uploaded.';
+        // Replace preview with the new URL
+        const preview = document.getElementById('ss-preview');
+        if (preview) {
+          const newImg = document.createElement('img');
+          newImg.id = 'ss-preview';
+          newImg.className = 'ss-preview';
+          newImg.alt = 'Screenshot preview';
+          newImg.src = data.asset.screenshot_url + '?t=' + Date.now();  // bust cache
+          preview.replaceWith(newImg);
+        }
+        // Update the upload button label to "Replace"
+        const btn = document.querySelector('.btn-upload');
+        if (btn) btn.textContent = 'Replace screenshot';
+        await refreshAssets();
+      } else {
+        status.className = 'ss-status error';
+        status.textContent = data.error || 'Upload failed.';
+      }
+    } catch (err) {
+      status.className = 'ss-status error';
+      status.textContent = 'Upload error: ' + (err.message || err);
+    } finally {
+      fileInput.value = '';  // allow re-selecting the same file
     }
   }
 

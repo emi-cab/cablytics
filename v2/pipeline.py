@@ -7,13 +7,11 @@ Execution order:
   Agent 4 runs after Agent 3
   Agent 5 runs after Agent 2
 
-Each agent's output is stored to the database as it completes, so the
-dashboard can show partial results while the pipeline is still running.
-
-Phase 2 changes:
-  • Agent 1 now receives the list of page assets so the prompt can inject
-    a URL→page-type mapping. URLs are still queried site-wide via GA4 if
-    no page assets exist.
+Phase 3 changes:
+  • _call_claude now accepts either a string user prompt (most agents) or a
+    list of content blocks (Agent 4 when screenshots are present).
+  • Agent 4 enriches its page assets with public screenshot URLs before
+    handing them to the prompt builder, so Claude can vision-analyse the pages.
 """
 
 import os
@@ -39,6 +37,7 @@ from v2.prompts_v2 import (
     agent4_prompt,
     agent5_prompt,
 )
+from v2.storage import public_url_for_path
 
 
 # ── Claude API helpers ─────────────────────────────────────────────────────────
@@ -50,21 +49,34 @@ def _get_claude_client() -> anthropic.Anthropic:
     return anthropic.Anthropic(api_key=api_key)
 
 
-def _call_claude(system: str, user: str, agent_num: int) -> dict:
+def _call_claude(system: str, user, agent_num: int) -> dict:
     """
     Make a single Claude API call and return parsed JSON.
-    Applies the same JSON sanitisation as V1 (ensure_ascii + regex).
+
+    `user` can be either:
+      • a string — sent as a plain text user message (most agents), or
+      • a list of content blocks — used by Agent 4 when screenshots are
+        present, to enable vision analysis.
+
+    Applies JSON sanitisation (ensure_ascii + regex) on the response.
     Raises ValueError if the response cannot be parsed as JSON.
     """
     client = _get_claude_client()
 
-    print(f"[V2][Agent{agent_num}] Calling Claude API...", flush=True)
+    # Build the message content depending on whether user is text or blocks
+    if isinstance(user, list):
+        message_content = user
+        image_count = sum(1 for b in user if isinstance(b, dict) and b.get("type") == "image")
+        print(f"[V2][Agent{agent_num}] Calling Claude API with {image_count} image(s)...", flush=True)
+    else:
+        message_content = user
+        print(f"[V2][Agent{agent_num}] Calling Claude API...", flush=True)
 
     message = client.messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=4000,
         system=system,
-        messages=[{"role": "user", "content": user}]
+        messages=[{"role": "user", "content": message_content}]
     )
 
     raw = message.content[0].text
@@ -84,6 +96,17 @@ def _call_claude(system: str, user: str, agent_num: int) -> dict:
     except json.JSONDecodeError as e:
         print(f"[V2][Agent{agent_num}] JSON parse failed: {e}\nRaw: {raw[:300]}", flush=True)
         raise ValueError(f"Agent {agent_num} returned non-JSON response: {e}")
+
+
+def _enrich_page_assets_with_urls(page_assets: list[dict]) -> list[dict]:
+    """Attach public screenshot URL to each asset that has a screenshot_path."""
+    enriched = []
+    for a in page_assets:
+        copy = dict(a)
+        if a.get("screenshot_path"):
+            copy["screenshot_url"] = public_url_for_path(a["screenshot_path"])
+        enriched.append(copy)
+    return enriched
 
 
 # ── Individual agent runners ───────────────────────────────────────────────────
@@ -160,14 +183,15 @@ def run_agent3(client_data: dict, report_id: int) -> dict:
 
 
 def run_agent4(agent3_output: dict, client_data: dict, report_id: int) -> dict:
-    """Copy Optimiser — rewrites headlines and page copy based on CEPs."""
+    """Copy Optimiser — rewrites headlines and page copy based on CEPs and screenshots."""
     client_id = client_data["id"]
     context   = client_data.get("client_context", "")
 
-    page_assets = list_page_assets(client_id)
+    page_assets = _enrich_page_assets_with_urls(list_page_assets(client_id))
+    screenshot_count = sum(1 for a in page_assets if a.get("screenshot_url"))
 
     log_event(client_id, "agent_started", report_id=report_id, agent_number=4,
-              message=f"Generating copy variants ({len(page_assets)} pages)")
+              message=f"Generating copy variants ({len(page_assets)} pages, {screenshot_count} screenshots)")
 
     system, user = agent4_prompt(agent3_output, page_assets, context)
     output = _call_claude(system, user, agent_num=4)
