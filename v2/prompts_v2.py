@@ -363,16 +363,81 @@ Output your JSON now."""
 
 # ── Agent 4: Copy Optimiser ────────────────────────────────────────────────────
 
-def agent4_prompt(agent3_output: dict, page_assets: list[dict],
-                  client_context: str):
+def _format_ad_creatives(ad_creatives: list[dict]) -> str:
     """
-    Returns (system_prompt, user_content) where user_content is either:
-      • a plain string when no page assets have screenshots, or
-      • a list of content blocks (text + image URLs) when screenshots exist.
+    Format ads as a labelled text block for Agent 4. Each ad references its
+    landing page asset (if linked) by label/type so Claude can pair them up
+    in its analysis.
+    """
+    if not ad_creatives:
+        return "No ad creatives provided."
 
-    Pipeline.py's _call_claude detects the type and constructs the API call accordingly.
+    lines = []
+    for a in ad_creatives:
+        platform   = (a.get("platform") or "other").upper()
+        ad_format  = (a.get("ad_format") or "").lower()
+        label      = a.get("ad_label") or "Untitled ad"
+
+        header = f"--- AD — {platform}"
+        if ad_format:
+            header += f" [{ad_format}]"
+        header += f" — {label}"
+
+        # Performance metrics, if any
+        metrics = []
+        if a.get("clicks") is not None:
+            metrics.append(f"{a['clicks']:,} clicks")
+        if a.get("impressions") is not None:
+            metrics.append(f"{a['impressions']:,} impressions")
+        if a.get("superads_score") is not None:
+            metrics.append(f"SuperAds score {a['superads_score']}")
+        if metrics:
+            header += " · " + ", ".join(metrics)
+        header += " ---"
+
+        block = [header]
+
+        if a.get("headline"):
+            block.append(f"Ad headline: {a['headline']}")
+        if a.get("primary_text"):
+            block.append(f"Ad primary text: {a['primary_text']}")
+        if a.get("cta_label"):
+            block.append(f"Ad CTA: {a['cta_label']}")
+
+        # Landing page link
+        lp_label = a.get("landing_page_label")
+        lp_type  = a.get("landing_page_type")
+        lp_url   = a.get("landing_page_url")
+        if lp_label or lp_url:
+            tag = (lp_type or "page").upper()
+            block.append(f"Links to landing page: {tag} — {lp_label or 'Untitled'} ({lp_url or 'no URL'})")
+        else:
+            block.append("Links to landing page: NOT LINKED — note this gap in your analysis")
+
+        if a.get("notes"):
+            block.append(f"Notes: {a['notes']}")
+
+        lines.append("\n".join(block))
+
+    return "\n\n".join(lines)
+
+
+def agent4_prompt(agent3_output: dict, page_assets: list[dict],
+                  client_context: str,
+                  ad_creatives: list[dict] = None):
+    """
+    Phase 6: Now optionally consumes ad creatives. When ads are present, Agent 4
+    produces an additional `ad_to_page_analysis` section comparing each ad to
+    its linked landing page (message match, visual match, promise carryover, CTA
+    alignment, top fix).
+
+    Returns (system_prompt, user_content) where user_content is either:
+      • a plain string when no screenshots (page or ad) are present, or
+      • a list of content blocks (text + image URLs) when any screenshots exist.
     """
     import json
+
+    has_ads = bool(ad_creatives)
 
     system = """You are a direct-response copywriter specialising in e-commerce.
 You write copy that works the outside-in: customer's entry point → emotional trigger →
@@ -390,6 +455,13 @@ You receive multiple tagged page versions. Some pages may include a SCREENSHOT �
 use it to comment on visual hierarchy, CTA prominence, trust signals, layout, whitespace, and
 how prominently the value proposition is communicated. Treat the screenshot as ground truth
 for what the user actually sees, and the extracted copy as the textual content for rewriting.
+
+You may also receive AD CREATIVES — actual ads the client is running on Google, Meta, TikTok,
+LinkedIn, etc. Each ad is paired with the landing page it sends users to. When ads are present,
+your job extends to analysing the AD-TO-LANDING-PAGE GAP: does the page deliver on what the
+ad promised within 3 seconds of arrival? Mismatch between ad and landing page is one of the
+biggest unaddressed CRO leaks. Weight your ad-to-page analysis by clicks/impressions when
+provided — high-volume mismatches matter more.
 
 Pick the page where Agent 3's research points to the strongest leak, but you may
 suggest copy fixes for additional pages where the gap is obvious.
@@ -445,15 +517,35 @@ Your JSON must follow this exact structure:
       "rationale": "Why this CTA better matches the CEP"
     }
   ],
+  "ad_to_page_analysis": [
+    {
+      "ad_label":          "The ad's label as provided",
+      "platform":          "google|meta|tiktok|linkedin|other",
+      "landing_page_label": "The linked landing page label, or 'NOT LINKED'",
+      "message_match": {
+        "verdict":  "strong|partial|weak|none",
+        "explanation": "What the ad promised vs what the page leads with"
+      },
+      "visual_match": {
+        "verdict":  "strong|partial|weak|none",
+        "explanation": "Whether the ad creative and landing page feel like the same brand world"
+      },
+      "promise_carryover": "What specific promise the ad made and whether the page delivers it within 3 seconds",
+      "cta_alignment": "Does the page CTA match what the ad CTA implied? (specific quote both sides)",
+      "top_priority_fix": "The single biggest concrete fix — copy, visual, or CTA — to close this ad's gap"
+    }
+  ],
   "words_to_remove": ["List of vague or off-CEP words currently in the copy"],
   "words_to_add": ["List of specific customer language phrases from the research"],
   "summary": "2-3 sentence plain English summary of the copy strategy."
 }
 
-If no screenshots are provided, omit the visual_observations array (or make it empty).
+If no screenshots are provided, omit visual_observations (or make it empty).
+If no ad creatives are provided, omit ad_to_page_analysis (or make it empty).
 """
 
     pages_block = _format_page_assets(page_assets)
+    ads_block   = _format_ad_creatives(ad_creatives) if has_ads else ""
 
     intro_text = f"""Rewrite the headline and primary page opening copy based on the consumer research below.
 
@@ -462,7 +554,15 @@ BUSINESS CONTEXT:
 
 CURRENT PAGE COPY (tagged by page type):
 {pages_block}
+"""
 
+    if has_ads:
+        intro_text += f"""
+AD CREATIVES (each linked to a landing page above):
+{ads_block}
+"""
+
+    intro_text += f"""
 CONSUMER RESEARCH OUTPUT (Agent 3):
 {json.dumps(agent3_output, indent=2, ensure_ascii=True)}
 
@@ -472,38 +572,63 @@ to lead with the primary CEP, not the product features.
 
 If other pages have obvious copy gaps that Agent 3 surfaced, add them under
 additional_page_suggestions — but keep that list short (max 3 items) and concrete.
+"""
 
+    if has_ads:
+        intro_text += """
+For EACH ad creative provided above, populate one entry in ad_to_page_analysis. Compare what
+the ad promises (visually + textually) against what the linked landing page actually delivers
+in the first scroll. Be specific — quote the ad's words and the page's words. If an ad has
+no landing page linked, flag that as the top_priority_fix. When clicks/impressions are
+provided, weight your top fixes toward the highest-volume ads.
+"""
+
+    intro_text += """
 No vague superlatives. No fake urgency. Use the exact customer language from the research.
 """
 
-    assets_with_images = [a for a in (page_assets or []) if a.get("screenshot_url")]
+    # Decide whether to send images. We send images for both page assets AND ad creatives
+    # if either has screenshots.
+    page_assets_with_images = [a for a in (page_assets or []) if a.get("screenshot_url")]
+    ads_with_images         = [a for a in (ad_creatives or []) if a.get("screenshot_url")]
 
-    if not assets_with_images:
+    if not page_assets_with_images and not ads_with_images:
         user_content = intro_text + "\nOutput your JSON now."
         return system, user_content
 
     blocks = [{"type": "text", "text": intro_text}]
 
-    for a in assets_with_images:
+    for a in page_assets_with_images:
         page_type = (a.get("page_type") or "other").upper()
         label     = a.get("page_label") or "Untitled"
-        url       = a.get("screenshot_url")
-
         blocks.append({
             "type": "text",
-            "text": f"\nSCREENSHOT — {page_type} ({label}):"
+            "text": f"\nSCREENSHOT — PAGE — {page_type} ({label}):"
         })
         blocks.append({
             "type": "image",
-            "source": {"type": "url", "url": url},
+            "source": {"type": "url", "url": a["screenshot_url"]},
         })
 
-    blocks.append({
-        "type": "text",
-        "text": "\nUse the screenshots to populate visual_observations with 2-4 concrete "
-                "findings. Then proceed with headline_variants, page_opening_rewrite, and "
-                "the rest of the JSON. Output your JSON now."
-    })
+    for a in ads_with_images:
+        platform = (a.get("platform") or "other").upper()
+        label    = a.get("ad_label") or "Untitled ad"
+        lp_label = a.get("landing_page_label") or "NOT LINKED"
+        blocks.append({
+            "type": "text",
+            "text": f"\nSCREENSHOT — AD — {platform} — {label} (links to: {lp_label}):"
+        })
+        blocks.append({
+            "type": "image",
+            "source": {"type": "url", "url": a["screenshot_url"]},
+        })
+
+    closing = "\nUse the page screenshots to populate visual_observations with 2-4 concrete findings. "
+    if has_ads:
+        closing += "Use the ad screenshots paired with their linked landing-page screenshots to populate ad_to_page_analysis. "
+    closing += "Then proceed with the rest of the JSON. Output your JSON now."
+
+    blocks.append({"type": "text", "text": closing})
 
     return system, blocks
 

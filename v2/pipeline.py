@@ -21,6 +21,7 @@ from v2.db import (
     log_event,
     get_client_by_slug,
     list_page_assets,
+    list_ad_creatives,
 )
 from v2.ga4_queries_v2 import collect_funnel_data, build_funnel_summary
 from v2.gsc_queries import collect_gsc_data, build_gsc_summary
@@ -31,7 +32,7 @@ from v2.prompts_v2 import (
     agent4_prompt,
     agent5_prompt,
 )
-from v2.storage import public_url_for_path
+from v2.storage import public_url_for_path, AD_CREATIVES_BUCKET
 
 
 # ── Claude API helpers ─────────────────────────────────────────────────────────
@@ -89,6 +90,19 @@ def _enrich_page_assets_with_urls(page_assets: list[dict]) -> list[dict]:
         copy = dict(a)
         if a.get("screenshot_path"):
             copy["screenshot_url"] = public_url_for_path(a["screenshot_path"])
+        enriched.append(copy)
+    return enriched
+
+
+def _enrich_ad_creatives_with_urls(ad_creatives: list[dict]) -> list[dict]:
+    """Attach public ad-creative screenshot URL to each ad that has one."""
+    enriched = []
+    for a in ad_creatives:
+        copy = dict(a)
+        if a.get("screenshot_path"):
+            copy["screenshot_url"] = public_url_for_path(
+                a["screenshot_path"], bucket=AD_CREATIVES_BUCKET
+            )
         enriched.append(copy)
     return enriched
 
@@ -182,22 +196,28 @@ def run_agent3(client_data: dict, report_id: int) -> dict:
 
 
 def run_agent4(agent3_output: dict, client_data: dict, report_id: int) -> dict:
-    """Copy Optimiser — rewrites headlines and page copy based on CEPs and screenshots."""
+    """Copy Optimiser — rewrites headlines and page copy based on CEPs, screenshots, and ads."""
     client_id = client_data["id"]
     context   = client_data.get("client_context", "")
 
-    page_assets = _enrich_page_assets_with_urls(list_page_assets(client_id))
-    screenshot_count = sum(1 for a in page_assets if a.get("screenshot_url"))
+    page_assets   = _enrich_page_assets_with_urls(list_page_assets(client_id))
+    ad_creatives  = _enrich_ad_creatives_with_urls(list_ad_creatives(client_id))
+
+    page_screenshots = sum(1 for a in page_assets  if a.get("screenshot_url"))
+    ad_screenshots   = sum(1 for a in ad_creatives if a.get("screenshot_url"))
 
     log_event(client_id, "agent_started", report_id=report_id, agent_number=4,
-              message=f"Generating copy variants ({len(page_assets)} pages, {screenshot_count} screenshots)")
+              message=(f"Generating copy variants ({len(page_assets)} pages, "
+                       f"{page_screenshots} page screenshots, "
+                       f"{len(ad_creatives)} ads, {ad_screenshots} ad screenshots)"))
 
-    system, user = agent4_prompt(agent3_output, page_assets, context)
+    system, user = agent4_prompt(agent3_output, page_assets, context, ad_creatives)
     output = _call_claude(system, user, agent_num=4)
 
     update_report_agent(report_id, 4, output)
     log_event(client_id, "agent_complete", report_id=report_id, agent_number=4,
-              message=f"Headline variants: {len(output.get('headline_variants', []))}")
+              message=(f"Headline variants: {len(output.get('headline_variants', []))}, "
+                       f"ad analyses: {len(output.get('ad_to_page_analysis', []))}"))
 
     return output
 

@@ -49,15 +49,25 @@ from v2.db import (
     delete_page_asset,
     get_client_by_id,
     VALID_PAGE_TYPES,
+    list_ad_creatives,
+    create_ad_creative,
+    update_ad_creative,
+    get_ad_creative,
+    delete_ad_creative,
+    VALID_AD_PLATFORMS,
+    VALID_AD_FORMATS,
 )
 from v2.pipeline import run_pipeline
 from v2.scheduler import register_client_job
 from v2.storage import (
     upload_screenshot,
+    upload_ad_creative,
     public_url_for_path,
     is_configured as storage_is_configured,
     ALLOWED_MIME_TYPES,
     MAX_UPLOAD_BYTES,
+    PAGE_SCREENSHOTS_BUCKET,
+    AD_CREATIVES_BUCKET,
 )
 
 v2 = Blueprint("v2", __name__, url_prefix="/v2",
@@ -322,6 +332,179 @@ def page_assets_upload_screenshot(asset_id):
     return jsonify({"success": True, "asset": _enrich_asset(updated)}), 200
 
 
+# ── Ad creatives (Phase 6) ─────────────────────────────────────────────────────
+
+def _enrich_ad(ad: dict) -> dict:
+    """Add the public ad-creative screenshot URL alongside the storage path."""
+    if not ad:
+        return ad
+    out = dict(ad)
+    if ad.get("screenshot_path"):
+        out["screenshot_url"] = public_url_for_path(ad["screenshot_path"], bucket=AD_CREATIVES_BUCKET)
+    else:
+        out["screenshot_url"] = None
+    return out
+
+
+@v2.route("/client/<slug>/ad-creatives", methods=["GET"])
+def ad_creatives_list(slug):
+    client = get_client_by_slug(slug)
+    if not client:
+        return jsonify({"error": "Client not found"}), 404
+
+    ads = [_enrich_ad(a) for a in list_ad_creatives(client["id"])]
+    page_assets = list_page_assets(client["id"])
+
+    return jsonify({
+        "client_slug": slug,
+        "ad_creatives": ads,
+        "page_assets": [
+            {"id": p["id"], "page_type": p["page_type"],
+             "page_label": p["page_label"], "url": p["url"]}
+            for p in page_assets
+        ],
+        "valid_platforms": sorted(VALID_AD_PLATFORMS),
+        "valid_formats":   sorted(VALID_AD_FORMATS),
+    })
+
+
+@v2.route("/client/<slug>/ad-creatives", methods=["POST"])
+def ad_creatives_create(slug):
+    client = get_client_by_slug(slug)
+    if not client:
+        return jsonify({"error": "Client not found"}), 404
+
+    data = request.get_json(silent=True) or {}
+
+    if not (data.get("ad_label") or "").strip():
+        return jsonify({"error": "ad_label is required"}), 400
+    if not (data.get("platform") or "").strip():
+        return jsonify({"error": "platform is required"}), 400
+
+    if data["platform"].lower() not in VALID_AD_PLATFORMS:
+        return jsonify({
+            "error": f"Invalid platform. Must be one of: {', '.join(sorted(VALID_AD_PLATFORMS))}"
+        }), 400
+
+    # If landing_page_asset_id is provided, validate it belongs to this client
+    lp_id = data.get("landing_page_asset_id")
+    if lp_id:
+        try:
+            lp_id = int(lp_id)
+        except (TypeError, ValueError):
+            return jsonify({"error": "landing_page_asset_id must be an integer"}), 400
+
+        page = get_page_asset(lp_id)
+        if not page or page["client_id"] != client["id"]:
+            return jsonify({"error": "landing_page_asset_id does not belong to this client"}), 400
+        data["landing_page_asset_id"] = lp_id
+
+    ad = create_ad_creative(client["id"], data)
+    return jsonify({"success": True, "ad": _enrich_ad(ad)}), 201
+
+
+@v2.route("/ad-creatives/<int:ad_id>", methods=["PATCH"])
+def ad_creatives_update(ad_id):
+    existing = get_ad_creative(ad_id)
+    if not existing:
+        return jsonify({"error": "Ad creative not found"}), 404
+
+    data = request.get_json(silent=True) or {}
+
+    if "platform" in data and data["platform"].lower() not in VALID_AD_PLATFORMS:
+        return jsonify({
+            "error": f"Invalid platform. Must be one of: {', '.join(sorted(VALID_AD_PLATFORMS))}"
+        }), 400
+
+    # Validate landing page belongs to same client
+    if "landing_page_asset_id" in data:
+        lp_id = data.get("landing_page_asset_id")
+        if lp_id is None or lp_id == "":
+            data["landing_page_asset_id"] = None
+        else:
+            try:
+                lp_id = int(lp_id)
+            except (TypeError, ValueError):
+                return jsonify({"error": "landing_page_asset_id must be an integer or null"}), 400
+            page = get_page_asset(lp_id)
+            if not page or page["client_id"] != existing["client_id"]:
+                return jsonify({"error": "landing_page_asset_id does not belong to this client"}), 400
+            data["landing_page_asset_id"] = lp_id
+
+    ad = update_ad_creative(ad_id, data)
+    return jsonify({"success": True, "ad": _enrich_ad(ad)})
+
+
+@v2.route("/ad-creatives/<int:ad_id>", methods=["DELETE"])
+def ad_creatives_delete(ad_id):
+    """
+    Delete an ad creative. The screenshot file in Supabase Storage is intentionally
+    orphaned (per project decision), same pattern as page assets.
+    """
+    existing = get_ad_creative(ad_id)
+    if not existing:
+        return jsonify({"error": "Ad creative not found"}), 404
+
+    deleted = delete_ad_creative(ad_id)
+    return jsonify({"success": deleted, "deleted_id": ad_id})
+
+
+@v2.route("/ad-creatives/<int:ad_id>/screenshot", methods=["POST"])
+def ad_creatives_upload_screenshot(ad_id):
+    """Upload an ad creative screenshot. Multipart form-data with 'file' field."""
+    if not storage_is_configured():
+        return jsonify({
+            "error": "Storage is not configured. SUPABASE_URL and SUPABASE_SERVICE_KEY env vars must be set."
+        }), 500
+
+    ad = get_ad_creative(ad_id)
+    if not ad:
+        return jsonify({"error": "Ad creative not found"}), 404
+
+    client = get_client_by_id(ad["client_id"])
+    if not client:
+        return jsonify({"error": "Owning client not found"}), 404
+
+    if "file" not in request.files:
+        return jsonify({"error": "No file uploaded under field name 'file'"}), 400
+
+    upload = request.files["file"]
+    if not upload or not upload.filename:
+        return jsonify({"error": "Empty upload"}), 400
+
+    file_bytes = upload.read()
+    content_type = (upload.mimetype or "").lower()
+    if content_type == "image/jpg":
+        content_type = "image/jpeg"
+
+    if content_type not in ALLOWED_MIME_TYPES:
+        return jsonify({
+            "error": f"Unsupported file type: {content_type or 'unknown'}. "
+                     f"Allowed: {', '.join(sorted(ALLOWED_MIME_TYPES))}"
+        }), 400
+
+    if len(file_bytes) > MAX_UPLOAD_BYTES:
+        return jsonify({
+            "error": f"File too large ({len(file_bytes) // 1024} KB). "
+                     f"Maximum is {MAX_UPLOAD_BYTES // 1024 // 1024}MB."
+        }), 400
+
+    try:
+        storage_path = upload_ad_creative(
+            client_slug=client["client_slug"],
+            ad_id=ad_id,
+            file_bytes=file_bytes,
+            content_type=content_type,
+        )
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except RuntimeError as e:
+        return jsonify({"error": f"Upload to storage failed: {str(e)}"}), 502
+
+    updated = update_ad_creative(ad_id, {"screenshot_path": storage_path})
+    return jsonify({"success": True, "ad": _enrich_ad(updated)}), 200
+
+
 # ── Report runs ────────────────────────────────────────────────────────────────
 
 @v2.route("/report/run", methods=["POST"])
@@ -480,8 +663,12 @@ def admin_edit(slug):
     client = get_client_by_slug(slug)
     if not client:
         abort(404)
-    page_assets = [_enrich_asset(a) for a in list_page_assets(client["id"])]
+    page_assets   = [_enrich_asset(a) for a in list_page_assets(client["id"])]
+    ad_creatives  = [_enrich_ad(a)    for a in list_ad_creatives(client["id"])]
     return render_template("admin_edit_client.html",
                            client=client,
                            page_assets=page_assets,
-                           valid_page_types=sorted(VALID_PAGE_TYPES))
+                           ad_creatives=ad_creatives,
+                           valid_page_types=sorted(VALID_PAGE_TYPES),
+                           valid_ad_platforms=sorted(VALID_AD_PLATFORMS),
+                           valid_ad_formats=sorted(VALID_AD_FORMATS))

@@ -1095,6 +1095,78 @@
         </div>
       {% endif %}
 
+      {% if a4.get('ad_to_page_analysis') %}
+        <div class="section-title">Ad-to-page gap analysis</div>
+        <div class="section-sub">For each curated ad, how well the landing page delivers the ad's promise</div>
+
+        {% for atp in a4.ad_to_page_analysis %}
+          <div class="card" style="margin-bottom:14px;">
+            <div style="display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
+              {% if atp.get('platform') %}
+                <span style="font-family:var(--mono); font-size:0.65rem; letter-spacing:0.08em; text-transform:uppercase; color:#fff; background:var(--ink); padding:3px 9px; border-radius:20px;">{{ atp.platform }}</span>
+              {% endif %}
+              <span style="font-size:0.95rem; font-weight:500; color:var(--ink);">{{ atp.get('ad_label', 'Untitled ad') }}</span>
+              {% if atp.get('landing_page_label') %}
+                <span style="font-family:var(--mono); font-size:0.7rem; color:var(--ink-3);">→ {{ atp.landing_page_label }}</span>
+              {% endif %}
+            </div>
+
+            {% if atp.get('message_match') %}
+              {% set mm = atp.message_match %}
+              {% if mm is mapping %}
+                <div style="margin-bottom:10px;">
+                  <div style="display:flex; align-items:baseline; gap:10px; margin-bottom:4px;">
+                    <span style="font-size:0.72rem; color:var(--ink-3); font-family:var(--mono); text-transform:uppercase; letter-spacing:0.06em;">Message match</span>
+                    {% set v = (mm.get('verdict','') or '').lower() %}
+                    <span style="font-family:var(--mono); font-size:0.7rem; padding:2px 8px; border-radius:20px; {% if v == 'strong' %}color:#047857; background:#d1fae5;{% elif v == 'partial' %}color:#b45309; background:#fef3c7;{% elif v == 'weak' or v == 'none' %}color:#991b1b; background:#fee2e2;{% else %}color:var(--ink-3); background:var(--surface-2);{% endif %}">{{ mm.get('verdict','—') }}</span>
+                  </div>
+                  {% if mm.get('explanation') %}
+                    <div style="font-size:0.82rem; color:var(--ink-2); line-height:1.55;">{{ mm.explanation }}</div>
+                  {% endif %}
+                </div>
+              {% endif %}
+            {% endif %}
+
+            {% if atp.get('visual_match') %}
+              {% set vm = atp.visual_match %}
+              {% if vm is mapping %}
+                <div style="margin-bottom:10px;">
+                  <div style="display:flex; align-items:baseline; gap:10px; margin-bottom:4px;">
+                    <span style="font-size:0.72rem; color:var(--ink-3); font-family:var(--mono); text-transform:uppercase; letter-spacing:0.06em;">Visual match</span>
+                    {% set v = (vm.get('verdict','') or '').lower() %}
+                    <span style="font-family:var(--mono); font-size:0.7rem; padding:2px 8px; border-radius:20px; {% if v == 'strong' %}color:#047857; background:#d1fae5;{% elif v == 'partial' %}color:#b45309; background:#fef3c7;{% elif v == 'weak' or v == 'none' %}color:#991b1b; background:#fee2e2;{% else %}color:var(--ink-3); background:var(--surface-2);{% endif %}">{{ vm.get('verdict','—') }}</span>
+                  </div>
+                  {% if vm.get('explanation') %}
+                    <div style="font-size:0.82rem; color:var(--ink-2); line-height:1.55;">{{ vm.explanation }}</div>
+                  {% endif %}
+                </div>
+              {% endif %}
+            {% endif %}
+
+            {% if atp.get('promise_carryover') %}
+              <div style="margin-bottom:10px;">
+                <div style="font-size:0.72rem; color:var(--ink-3); font-family:var(--mono); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:4px;">Promise carryover</div>
+                <div style="font-size:0.82rem; color:var(--ink-2); line-height:1.55;">{{ atp.promise_carryover }}</div>
+              </div>
+            {% endif %}
+
+            {% if atp.get('cta_alignment') %}
+              <div style="margin-bottom:10px;">
+                <div style="font-size:0.72rem; color:var(--ink-3); font-family:var(--mono); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:4px;">CTA alignment</div>
+                <div style="font-size:0.82rem; color:var(--ink-2); line-height:1.55;">{{ atp.cta_alignment }}</div>
+              </div>
+            {% endif %}
+
+            {% if atp.get('top_priority_fix') %}
+              <div style="margin-top:14px; padding:10px 12px; background:var(--surface-2); border-radius:4px;">
+                <div style="font-size:0.72rem; color:var(--ink-3); font-family:var(--mono); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:4px;">Top priority fix</div>
+                <div style="font-size:0.85rem; color:var(--ink); line-height:1.55; font-weight:500;">{{ atp.top_priority_fix }}</div>
+              </div>
+            {% endif %}
+          </div>
+        {% endfor %}
+      {% endif %}
+
       <div class="section-title">Headline variants</div>
       <div class="section-sub">Three testable headlines — one per proven formula</div>
 

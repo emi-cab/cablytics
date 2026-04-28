@@ -1,23 +1,25 @@
 """
 CABlytics V2 — Supabase Storage helper.
 
-Thin wrapper over Supabase Storage's HTTP API. Used by Phase 3 to upload
-page screenshots and return public URLs.
+Thin wrapper over Supabase Storage's HTTP API. Used by:
+  • Phase 3: page screenshots (bucket: page-screenshots)
+  • Phase 6: ad creative screenshots (bucket: ad-creatives)
+
+Both buckets must be created as PUBLIC in Supabase Storage so URLs can be
+fetched directly by Claude vision without signed URLs.
 
 Reads two env vars set on Render:
   • SUPABASE_URL          e.g. https://xxxxx.supabase.co
-  • SUPABASE_SERVICE_KEY  the secret service-role key
-
-We use raw HTTP with `requests` rather than the supabase Python SDK to
-avoid adding another dependency. The Storage API surface we need is small.
+  • SUPABASE_SERVICE_KEY  the secret service-role JWT key
 """
 
 import os
 import time
-import mimetypes
 import requests
 
-BUCKET_NAME = "page-screenshots"
+# Bucket names — must match exactly what's configured in Supabase Storage
+PAGE_SCREENSHOTS_BUCKET = "page-screenshots"
+AD_CREATIVES_BUCKET     = "ad-creatives"
 
 ALLOWED_MIME_TYPES = {
     "image/png",
@@ -27,11 +29,8 @@ ALLOWED_MIME_TYPES = {
 }
 
 # Max bytes accepted at the Flask layer (the bucket itself is also limited).
-# 5 MB matches the bucket's file size limit.
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 
-
-# ── Config ─────────────────────────────────────────────────────────────────────
 
 def _get_supabase_url() -> str:
     url = os.environ.get("SUPABASE_URL")
@@ -48,11 +47,8 @@ def _get_service_key() -> str:
 
 
 def is_configured() -> bool:
-    """Quick check used by routes to surface a clean error if env vars are missing."""
     return bool(os.environ.get("SUPABASE_URL")) and bool(os.environ.get("SUPABASE_SERVICE_KEY"))
 
-
-# ── Upload ─────────────────────────────────────────────────────────────────────
 
 def _ext_for_mime(mime: str) -> str:
     if mime == "image/png":
@@ -64,15 +60,14 @@ def _ext_for_mime(mime: str) -> str:
     return "bin"
 
 
-def upload_screenshot(client_slug: str, asset_id: int,
-                      file_bytes: bytes, content_type: str) -> str:
-    """
-    Upload a screenshot to Supabase Storage and return the *path* relative to
-    the bucket. The public URL can be derived later via public_url_for_path().
+def _safe_slug(slug: str) -> str:
+    out = "".join(c if c.isalnum() or c in "-_" else "-" for c in slug).strip("-")
+    return out or "client"
 
-    Raises ValueError on validation errors (bad MIME, too large).
-    Raises RuntimeError on Supabase API errors.
-    """
+
+def _upload_to_bucket(bucket: str, storage_path: str,
+                      file_bytes: bytes, content_type: str) -> str:
+    """Internal — single upload helper used by both bucket-specific functions."""
     if content_type not in ALLOWED_MIME_TYPES:
         raise ValueError(
             f"Unsupported content type: {content_type}. "
@@ -88,24 +83,14 @@ def upload_screenshot(client_slug: str, asset_id: int,
     if not file_bytes:
         raise ValueError("File is empty.")
 
-    ext = _ext_for_mime(content_type)
-    timestamp = int(time.time())
-    safe_slug = "".join(c if c.isalnum() or c in "-_" else "-" for c in client_slug).strip("-")
-    if not safe_slug:
-        safe_slug = "client"
-
-    storage_path = f"{safe_slug}/{asset_id}-{timestamp}.{ext}"
-
-    upload_url = f"{_get_supabase_url()}/storage/v1/object/{BUCKET_NAME}/{storage_path}"
+    upload_url = f"{_get_supabase_url()}/storage/v1/object/{bucket}/{storage_path}"
     headers = {
         "Authorization": f"Bearer {_get_service_key()}",
         "Content-Type": content_type,
-        # x-upsert lets us overwrite if the path already exists (it shouldn't
-        # because of the timestamp, but this avoids weird edge cases on retries)
         "x-upsert": "true",
     }
 
-    print(f"[V2][storage] Uploading {len(file_bytes)} bytes to {storage_path}", flush=True)
+    print(f"[V2][storage] Uploading {len(file_bytes)} bytes to {bucket}/{storage_path}", flush=True)
 
     response = requests.post(upload_url, headers=headers, data=file_bytes, timeout=30)
 
@@ -114,16 +99,35 @@ def upload_screenshot(client_slug: str, asset_id: int,
         print(f"[V2][storage] {msg}", flush=True)
         raise RuntimeError(msg)
 
-    print(f"[V2][storage] Upload OK: {storage_path}", flush=True)
+    print(f"[V2][storage] Upload OK: {bucket}/{storage_path}", flush=True)
     return storage_path
 
 
-def public_url_for_path(storage_path: str) -> str:
+def upload_screenshot(client_slug: str, asset_id: int,
+                      file_bytes: bytes, content_type: str) -> str:
+    """Upload a page screenshot to the page-screenshots bucket."""
+    ext       = _ext_for_mime(content_type)
+    timestamp = int(time.time())
+    storage_path = f"{_safe_slug(client_slug)}/{asset_id}-{timestamp}.{ext}"
+    return _upload_to_bucket(PAGE_SCREENSHOTS_BUCKET, storage_path, file_bytes, content_type)
+
+
+def upload_ad_creative(client_slug: str, ad_id: int,
+                       file_bytes: bytes, content_type: str) -> str:
+    """Upload an ad creative screenshot to the ad-creatives bucket."""
+    ext       = _ext_for_mime(content_type)
+    timestamp = int(time.time())
+    storage_path = f"{_safe_slug(client_slug)}/{ad_id}-{timestamp}.{ext}"
+    return _upload_to_bucket(AD_CREATIVES_BUCKET, storage_path, file_bytes, content_type)
+
+
+def public_url_for_path(storage_path: str, bucket: str = PAGE_SCREENSHOTS_BUCKET) -> str:
     """
-    Build the public URL for a storage path. The bucket is configured as
-    public, so this URL is fetchable without authentication and can be passed
-    directly to Claude's vision API as an image source.
+    Build the public URL for a storage path.
+
+    Defaults to page-screenshots for backward compatibility with Phase 3 callers.
+    Phase 6 callers should pass bucket=AD_CREATIVES_BUCKET for ad creative paths.
     """
     if not storage_path:
         return ""
-    return f"{_get_supabase_url()}/storage/v1/object/public/{BUCKET_NAME}/{storage_path}"
+    return f"{_get_supabase_url()}/storage/v1/object/public/{bucket}/{storage_path}"

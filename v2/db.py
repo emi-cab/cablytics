@@ -131,6 +131,26 @@ def _init_postgres():
                     updated_at        TEXT NOT NULL
                 );
 
+                CREATE TABLE IF NOT EXISTS client_ad_creatives (
+                    id                       SERIAL PRIMARY KEY,
+                    client_id                INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+                    landing_page_asset_id    INTEGER REFERENCES client_page_assets(id) ON DELETE SET NULL,
+                    platform                 TEXT NOT NULL,
+                    ad_format                TEXT,
+                    ad_label                 TEXT NOT NULL,
+                    headline                 TEXT,
+                    primary_text             TEXT,
+                    cta_label                TEXT,
+                    screenshot_path          TEXT,
+                    clicks                   INTEGER,
+                    impressions              INTEGER,
+                    superads_score           INTEGER,
+                    notes                    TEXT,
+                    display_order            INTEGER DEFAULT 0,
+                    created_at               TEXT NOT NULL,
+                    updated_at               TEXT NOT NULL
+                );
+
                 CREATE TABLE IF NOT EXISTS reports (
                     id                  SERIAL PRIMARY KEY,
                     client_id           INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
@@ -193,6 +213,26 @@ def _init_sqlite():
                 display_order     INTEGER DEFAULT 0,
                 created_at        TEXT NOT NULL,
                 updated_at        TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS client_ad_creatives (
+                id                       INTEGER PRIMARY KEY AUTOINCREMENT,
+                client_id                INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+                landing_page_asset_id    INTEGER REFERENCES client_page_assets(id) ON DELETE SET NULL,
+                platform                 TEXT NOT NULL,
+                ad_format                TEXT,
+                ad_label                 TEXT NOT NULL,
+                headline                 TEXT,
+                primary_text             TEXT,
+                cta_label                TEXT,
+                screenshot_path          TEXT,
+                clicks                   INTEGER,
+                impressions              INTEGER,
+                superads_score           INTEGER,
+                notes                    TEXT,
+                display_order            INTEGER DEFAULT 0,
+                created_at               TEXT NOT NULL,
+                updated_at               TEXT NOT NULL
             );
 
             CREATE TABLE IF NOT EXISTS reports (
@@ -663,3 +703,167 @@ def get_run_log(client_id: int, report_id: int = None, limit: int = 50) -> list[
                 SELECT * FROM run_log WHERE client_id = ?
                 ORDER BY timestamp DESC LIMIT ?
             """, (client_id, limit))
+
+
+# ── Client ad creatives (Phase 6) ──────────────────────────────────────────────
+
+VALID_AD_PLATFORMS = {
+    "google", "meta", "tiktok", "linkedin", "other"
+}
+
+VALID_AD_FORMATS = {
+    "image", "video", "carousel", "other"
+}
+
+AD_CREATIVE_FIELDS = (
+    "platform",
+    "ad_format",
+    "ad_label",
+    "headline",
+    "primary_text",
+    "cta_label",
+    "screenshot_path",
+    "landing_page_asset_id",
+    "clicks",
+    "impressions",
+    "superads_score",
+    "notes",
+    "display_order",
+)
+
+
+def _normalise_ad_platform(value: str) -> str:
+    v = (value or "other").lower().strip()
+    return v if v in VALID_AD_PLATFORMS else "other"
+
+
+def _normalise_ad_format(value: str) -> str | None:
+    if value is None or value == "":
+        return None
+    v = value.lower().strip()
+    return v if v in VALID_AD_FORMATS else "other"
+
+
+def create_ad_creative(client_id: int, data: dict) -> dict:
+    ts = now_utc()
+    values = (
+        client_id,
+        _normalise_ad_platform(data.get("platform")),
+        _normalise_ad_format(data.get("ad_format")),
+        data.get("ad_label") or "Untitled ad",
+        data.get("headline"),
+        data.get("primary_text"),
+        data.get("cta_label"),
+        data.get("screenshot_path"),
+        data.get("landing_page_asset_id"),
+        data.get("clicks"),
+        data.get("impressions"),
+        data.get("superads_score"),
+        data.get("notes"),
+        data.get("display_order", 0),
+        ts,
+        ts,
+    )
+
+    cols = (
+        "client_id, platform, ad_format, ad_label, headline, primary_text, "
+        "cta_label, screenshot_path, landing_page_asset_id, clicks, impressions, "
+        "superads_score, notes, display_order, created_at, updated_at"
+    )
+
+    with get_connection() as conn:
+        if DATABASE_URL:
+            with conn.cursor() as cur:
+                cur.execute(f"""
+                    INSERT INTO client_ad_creatives ({cols})
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    RETURNING *
+                """, values)
+                row = cur.fetchone()
+                return dict(row) if row else None
+        else:
+            cur = conn.execute(f"""
+                INSERT INTO client_ad_creatives ({cols})
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """, values)
+            row = conn.execute(
+                "SELECT * FROM client_ad_creatives WHERE id = ?", (cur.lastrowid,)
+            ).fetchone()
+            return dict(row) if row else None
+
+
+def update_ad_creative(ad_id: int, data: dict) -> dict | None:
+    updates = {k: v for k, v in data.items() if k in AD_CREATIVE_FIELDS}
+    if "platform" in updates:
+        updates["platform"] = _normalise_ad_platform(updates["platform"])
+    if "ad_format" in updates:
+        updates["ad_format"] = _normalise_ad_format(updates["ad_format"])
+
+    if not updates:
+        return get_ad_creative(ad_id)
+
+    updates["updated_at"] = now_utc()
+    set_clause = ", ".join(f"{k} = {PLACEHOLDER}" for k in updates)
+    values = list(updates.values()) + [ad_id]
+
+    with get_connection() as conn:
+        if DATABASE_URL:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"UPDATE client_ad_creatives SET {set_clause} WHERE id = {PLACEHOLDER}",
+                    values,
+                )
+        else:
+            conn.execute(
+                f"UPDATE client_ad_creatives SET {set_clause} WHERE id = ?",
+                values,
+            )
+
+    return get_ad_creative(ad_id)
+
+
+def get_ad_creative(ad_id: int) -> dict | None:
+    with get_connection() as conn:
+        if DATABASE_URL:
+            with conn.cursor() as cur:
+                return _row(cur, f"SELECT * FROM client_ad_creatives WHERE id = {PLACEHOLDER}", (ad_id,))
+        else:
+            return _row(conn, "SELECT * FROM client_ad_creatives WHERE id = ?", (ad_id,))
+
+
+def list_ad_creatives(client_id: int) -> list[dict]:
+    """
+    Return all ad creatives for a client, ordered for display. Each row also
+    includes the linked landing page's label, URL, and page_type as
+    landing_page_label / landing_page_url / landing_page_type so callers don't
+    need a second query.
+    """
+    sql_pg = """
+        SELECT a.*,
+               p.page_label AS landing_page_label,
+               p.url        AS landing_page_url,
+               p.page_type  AS landing_page_type
+        FROM client_ad_creatives a
+        LEFT JOIN client_page_assets p ON p.id = a.landing_page_asset_id
+        WHERE a.client_id = %s
+        ORDER BY a.display_order ASC, a.id ASC
+    """
+    sql_lite = sql_pg.replace("%s", "?")
+
+    with get_connection() as conn:
+        if DATABASE_URL:
+            with conn.cursor() as cur:
+                return _rows(cur, sql_pg, (client_id,))
+        else:
+            return _rows(conn, sql_lite, (client_id,))
+
+
+def delete_ad_creative(ad_id: int) -> bool:
+    with get_connection() as conn:
+        if DATABASE_URL:
+            with conn.cursor() as cur:
+                cur.execute(f"DELETE FROM client_ad_creatives WHERE id = {PLACEHOLDER}", (ad_id,))
+                return cur.rowcount > 0
+        else:
+            result = conn.execute("DELETE FROM client_ad_creatives WHERE id = ?", (ad_id,))
+            return result.rowcount > 0

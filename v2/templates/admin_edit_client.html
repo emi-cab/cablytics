@@ -218,6 +218,54 @@
     .asset-type-tag.category { background: #0e7490; }
     .asset-type-tag.other    { background: var(--ink-3); }
 
+    /* ── Ad creative cards ────────────────────────────────────────────── */
+    .ad-platform-tag {
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #fff;
+      padding: 3px 9px;
+      border-radius: 20px;
+      flex-shrink: 0;
+    }
+    .ad-platform-tag.google   { background: #4285f4; }
+    .ad-platform-tag.meta     { background: #1877f2; }
+    .ad-platform-tag.tiktok   { background: #010101; }
+    .ad-platform-tag.linkedin { background: #0a66c2; }
+    .ad-platform-tag.other    { background: var(--ink-3); }
+
+    .ad-format-pill {
+      font-family: var(--mono);
+      font-size: 0.62rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+      border: 1px solid var(--border);
+      padding: 2px 7px;
+      border-radius: 20px;
+    }
+
+    .ad-metrics {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--ink-3);
+      margin: 6px 0 8px;
+    }
+    .ad-metrics span strong { color: var(--ink); font-weight: 500; }
+
+    .ad-landing-link {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--ink-3);
+      margin-top: 4px;
+    }
+    .ad-landing-link.unlinked { color: var(--accent-2); }
+    .ad-landing-link strong { color: var(--ink-2); font-weight: 500; }
+
     .asset-label {
       font-size: 0.9rem;
       font-weight: 500;
@@ -674,10 +722,92 @@
       </button>
     </div>
 
-    <!-- 5. Test sizing -->
+    <!-- 5. Ad creatives -->
     <div class="section">
       <div class="section-header">
         <span class="section-num">05</span>
+        <span class="section-title">Ad creatives</span>
+        <span class="section-note" id="ads-count-note">{{ ad_creatives|length }} configured · optional</span>
+      </div>
+
+      <p class="page-desc" style="margin-bottom:18px; font-size:0.82rem">
+        Optional. Paste 3–5 of the highest-clicked ads from SuperAds and link each to its landing page above. Agent 4 will analyse the ad-to-page gap (message match, visual match, promise carryover) for every linked pair. Skip this section entirely if not relevant for this client.
+      </p>
+
+      <div id="ad-form-container"></div>
+
+      <div id="ads-list">
+        {% if ad_creatives %}
+          {% for ad in ad_creatives %}
+          <div class="asset-card" data-ad-id="{{ ad.id }}">
+            <div class="asset-card-header">
+              <span class="ad-platform-tag {{ ad.platform }}">{{ ad.platform }}</span>
+              {% if ad.ad_format %}
+                <span class="ad-format-pill">{{ ad.ad_format }}</span>
+              {% endif %}
+              <span class="asset-label">{{ ad.ad_label }}</span>
+              <div class="asset-actions">
+                <button type="button" class="asset-action-btn" onclick="editAd({{ ad.id }})">Edit</button>
+                <button type="button" class="asset-action-btn danger" onclick="deleteAd({{ ad.id }})">Delete</button>
+              </div>
+            </div>
+
+            {% if ad.clicks is not none or ad.impressions is not none or ad.superads_score is not none %}
+              <div class="ad-metrics">
+                {% if ad.clicks is not none %}
+                  <span><strong>{{ '{:,}'.format(ad.clicks) }}</strong> clicks</span>
+                {% endif %}
+                {% if ad.impressions is not none %}
+                  <span><strong>{{ '{:,}'.format(ad.impressions) }}</strong> impressions</span>
+                {% endif %}
+                {% if ad.superads_score is not none %}
+                  <span>SuperAds score <strong>{{ ad.superads_score }}</strong></span>
+                {% endif %}
+              </div>
+            {% endif %}
+
+            <div class="asset-body {% if not ad.screenshot_url %}no-thumb{% endif %}">
+              <div>
+                {% if ad.headline %}
+                  <div style="font-size:0.85rem; font-weight:500; color:var(--ink); margin-bottom:4px;">{{ ad.headline }}</div>
+                {% endif %}
+                {% if ad.primary_text %}
+                  <div class="asset-copy-preview">{{ ad.primary_text[:200] }}{% if ad.primary_text|length > 200 %}…{% endif %}</div>
+                {% endif %}
+                {% if not ad.headline and not ad.primary_text %}
+                  <div class="asset-copy-empty">No copy captured yet.</div>
+                {% endif %}
+
+                {% if ad.landing_page_label %}
+                  <div class="ad-landing-link">→ Links to: <strong>{{ ad.landing_page_type|upper }}</strong> {{ ad.landing_page_label }}</div>
+                {% else %}
+                  <div class="ad-landing-link unlinked">⚠ Not linked to a landing page</div>
+                {% endif %}
+              </div>
+              {% if ad.screenshot_url %}
+                <a href="{{ ad.screenshot_url }}" target="_blank" rel="noopener">
+                  <img class="asset-thumb" src="{{ ad.screenshot_url }}" alt="Ad creative">
+                </a>
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="assets-empty" id="ads-empty-msg">
+            No ads added. Skip if you don't need ad-to-page analysis for this client.
+          </div>
+        {% endif %}
+      </div>
+
+      <button type="button" class="btn-add-asset" id="btn-add-ad" style="margin-top:12px" onclick="addAd()">
+        + Add ad creative
+      </button>
+    </div>
+
+    <!-- 6. Test sizing -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-num">06</span>
         <span class="section-title">Test sizing</span>
       </div>
       <div class="grid-2">
@@ -692,10 +822,10 @@
       </div>
     </div>
 
-    <!-- 6. Schedule -->
+    <!-- 7. Schedule -->
     <div class="section">
       <div class="section-header">
-        <span class="section-num">06</span>
+        <span class="section-num">07</span>
         <span class="section-title">Report schedule</span>
       </div>
       <div class="grid-3">
@@ -746,6 +876,8 @@
   // ── Config injected from Jinja ────────────────────────────────────────
   const CLIENT_SLUG     = '{{ client.client_slug }}';
   const VALID_PAGE_TYPES = {{ valid_page_types|tojson }};
+  const VALID_AD_PLATFORMS = {{ valid_ad_platforms|tojson }};
+  const VALID_AD_FORMATS   = {{ valid_ad_formats|tojson }};
 
   // ── Char counters ─────────────────────────────────────────────────────
   const vocVolEl     = document.getElementById('voc_volunteered');
@@ -1112,6 +1244,378 @@
       status.textContent = 'Upload error: ' + (err.message || err);
     } finally {
       fileInput.value = '';  // allow re-selecting the same file
+    }
+  }
+
+  // ── Ad creative management ────────────────────────────────────────────
+  const adFormContainer = document.getElementById('ad-form-container');
+  const adsList         = document.getElementById('ads-list');
+  const adAddBtn        = document.getElementById('btn-add-ad');
+
+  function renderAdCard(ad) {
+    const platform = (ad.platform || 'other').toLowerCase();
+    const format   = ad.ad_format ? `<span class="ad-format-pill">${escapeHtml(ad.ad_format)}</span>` : '';
+    const headline = ad.headline ? `<div style="font-size:0.85rem; font-weight:500; color:var(--ink); margin-bottom:4px;">${escapeHtml(ad.headline)}</div>` : '';
+    const text     = ad.primary_text
+      ? `<div class="asset-copy-preview">${escapeHtml(ad.primary_text.slice(0, 200))}${ad.primary_text.length > 200 ? '…' : ''}</div>`
+      : (ad.headline ? '' : `<div class="asset-copy-empty">No copy captured yet.</div>`);
+
+    let metricsHtml = '';
+    const m = [];
+    if (ad.clicks != null)         m.push(`<span><strong>${ad.clicks.toLocaleString()}</strong> clicks</span>`);
+    if (ad.impressions != null)    m.push(`<span><strong>${ad.impressions.toLocaleString()}</strong> impressions</span>`);
+    if (ad.superads_score != null) m.push(`<span>SuperAds score <strong>${ad.superads_score}</strong></span>`);
+    if (m.length) metricsHtml = `<div class="ad-metrics">${m.join('')}</div>`;
+
+    const lpHtml = ad.landing_page_label
+      ? `<div class="ad-landing-link">→ Links to: <strong>${escapeHtml((ad.landing_page_type || '').toUpperCase())}</strong> ${escapeHtml(ad.landing_page_label)}</div>`
+      : `<div class="ad-landing-link unlinked">⚠ Not linked to a landing page</div>`;
+
+    const thumbHtml = ad.screenshot_url
+      ? `<a href="${escapeHtml(ad.screenshot_url)}" target="_blank" rel="noopener"><img class="asset-thumb" src="${escapeHtml(ad.screenshot_url)}" alt="Ad creative"></a>`
+      : '';
+    const bodyClass = ad.screenshot_url ? '' : 'no-thumb';
+
+    return `
+      <div class="asset-card" data-ad-id="${ad.id}">
+        <div class="asset-card-header">
+          <span class="ad-platform-tag ${escapeHtml(platform)}">${escapeHtml(platform)}</span>
+          ${format}
+          <span class="asset-label">${escapeHtml(ad.ad_label)}</span>
+          <div class="asset-actions">
+            <button type="button" class="asset-action-btn" onclick="editAd(${ad.id})">Edit</button>
+            <button type="button" class="asset-action-btn danger" onclick="deleteAd(${ad.id})">Delete</button>
+          </div>
+        </div>
+        ${metricsHtml}
+        <div class="asset-body ${bodyClass}">
+          <div>
+            ${headline}
+            ${text}
+            ${lpHtml}
+          </div>
+          ${thumbHtml}
+        </div>
+      </div>
+    `;
+  }
+
+  // Cached page assets list (so the landing page dropdown in the ad form
+  // doesn't need a separate fetch). We refresh this from the page-assets
+  // endpoint whenever the form opens, so adding a page and then linking an
+  // ad to it works without a page reload.
+  let _pageAssetsCache = [];
+
+  async function refreshPageAssetsCache() {
+    try {
+      const res = await fetch(`/v2/client/${CLIENT_SLUG}/page-assets`);
+      const data = await res.json();
+      _pageAssetsCache = (data.page_assets || []).map(p => ({
+        id: p.id, page_type: p.page_type,
+        page_label: p.page_label, url: p.url
+      }));
+    } catch (err) {
+      _pageAssetsCache = [];
+    }
+  }
+
+  async function refreshAds() {
+    try {
+      const res = await fetch(`/v2/client/${CLIENT_SLUG}/ad-creatives`);
+      const data = await res.json();
+      const ads = data.ad_creatives || [];
+
+      document.getElementById('ads-count-note').textContent =
+        `${ads.length} configured · optional`;
+
+      if (ads.length === 0) {
+        adsList.innerHTML = `
+          <div class="assets-empty" id="ads-empty-msg">
+            No ads added. Skip if you don't need ad-to-page analysis for this client.
+          </div>`;
+      } else {
+        adsList.innerHTML = ads.map(renderAdCard).join('');
+      }
+    } catch (err) {
+      showFlash('error', 'Could not refresh ad creatives.');
+    }
+  }
+
+  function buildAdForm(ad = null) {
+    const isEdit = ad !== null;
+
+    const platformOptions = VALID_AD_PLATFORMS.map(p => {
+      const sel = isEdit && ad.platform === p ? 'selected' : '';
+      return `<option value="${p}" ${sel}>${p}</option>`;
+    }).join('');
+
+    const formatOptions = ['<option value="">—</option>'].concat(
+      VALID_AD_FORMATS.map(f => {
+        const sel = isEdit && ad.ad_format === f ? 'selected' : '';
+        return `<option value="${f}" ${sel}>${f}</option>`;
+      })
+    ).join('');
+
+    const lpOptions = ['<option value="">— not linked —</option>'].concat(
+      _pageAssetsCache.map(p => {
+        const sel = isEdit && ad.landing_page_asset_id === p.id ? 'selected' : '';
+        const label = `${(p.page_type || '').toUpperCase()} — ${p.page_label}`;
+        return `<option value="${p.id}" ${sel}>${escapeHtml(label)}</option>`;
+      })
+    ).join('');
+
+    const screenshotHtml = isEdit ? buildAdScreenshotUploader(ad) : '';
+
+    return `
+      <div class="asset-form" id="ad-form" data-ad-id="${isEdit ? ad.id : ''}">
+        <div class="asset-form-title">${isEdit ? 'Edit ad creative' : 'New ad creative'}</div>
+
+        <div class="grid-3" style="margin-bottom:12px">
+          <div class="field">
+            <label for="ad-platform">Platform</label>
+            <select id="ad-platform">${platformOptions}</select>
+          </div>
+          <div class="field">
+            <label for="ad-format">Format <span class="hint">optional</span></label>
+            <select id="ad-format">${formatOptions}</select>
+          </div>
+          <div class="field">
+            <label for="ad-label">Label <span class="hint">e.g. "BF lifestyle hero"</span></label>
+            <input type="text" id="ad-label" placeholder="Short identifying label" value="${isEdit ? escapeHtml(ad.ad_label || '') : ''}">
+          </div>
+        </div>
+
+        <div class="field" style="margin-bottom:12px">
+          <label for="ad-landing-page">Landing page <span class="hint">which page asset does this ad send users to?</span></label>
+          <select id="ad-landing-page">${lpOptions}</select>
+        </div>
+
+        <div class="field" style="margin-bottom:12px">
+          <label for="ad-headline">Ad headline</label>
+          <input type="text" id="ad-headline" placeholder="The ad's main headline" value="${isEdit ? escapeHtml(ad.headline || '') : ''}">
+        </div>
+
+        <div class="field" style="margin-bottom:12px">
+          <label for="ad-primary-text">Primary text / body</label>
+          <textarea id="ad-primary-text" rows="3" placeholder="The ad's body copy / description text">${isEdit ? escapeHtml(ad.primary_text || '') : ''}</textarea>
+        </div>
+
+        <div class="field" style="margin-bottom:12px">
+          <label for="ad-cta">CTA label <span class="hint">e.g. "Shop Now"</span></label>
+          <input type="text" id="ad-cta" placeholder="The ad's CTA button text" value="${isEdit ? escapeHtml(ad.cta_label || '') : ''}">
+        </div>
+
+        <div class="grid-3" style="margin-bottom:12px">
+          <div class="field">
+            <label for="ad-clicks">Clicks <span class="hint">optional</span></label>
+            <input type="number" id="ad-clicks" min="0" value="${isEdit && ad.clicks != null ? ad.clicks : ''}">
+          </div>
+          <div class="field">
+            <label for="ad-impressions">Impressions <span class="hint">optional</span></label>
+            <input type="number" id="ad-impressions" min="0" value="${isEdit && ad.impressions != null ? ad.impressions : ''}">
+          </div>
+          <div class="field">
+            <label for="ad-score">SuperAds score <span class="hint">0-100</span></label>
+            <input type="number" id="ad-score" min="0" max="100" value="${isEdit && ad.superads_score != null ? ad.superads_score : ''}">
+          </div>
+        </div>
+
+        <div class="field" style="margin-bottom:12px">
+          <label for="ad-notes">Notes <span class="hint">optional</span></label>
+          <textarea id="ad-notes" rows="2" placeholder="Anything specific to flag about this ad">${isEdit ? escapeHtml(ad.notes || '') : ''}</textarea>
+        </div>
+
+        ${screenshotHtml}
+
+        <div class="asset-form-actions">
+          <button type="button" class="btn-asset-save" onclick="saveAd()">${isEdit ? 'Save changes' : 'Add ad'}</button>
+          <button type="button" class="btn-asset-cancel" onclick="cancelAdForm()">Cancel</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function buildAdScreenshotUploader(ad) {
+    const hasShot = !!ad.screenshot_url;
+    const previewHtml = hasShot
+      ? `<img id="ad-ss-preview" class="ss-preview" src="${escapeHtml(ad.screenshot_url)}" alt="Ad creative">`
+      : `<div id="ad-ss-preview" class="ss-preview-empty">no creative uploaded</div>`;
+
+    return `
+      <div class="field" style="margin-bottom:12px">
+        <label>Ad creative image <span class="hint">used by Agent 4 for visual analysis</span></label>
+        <div class="ss-uploader">
+          ${previewHtml}
+          <div class="ss-controls">
+            <input type="file" id="ad-ss-file-input" accept="image/png,image/jpeg,image/webp" style="display:none">
+            <button type="button" class="btn-upload" onclick="document.getElementById('ad-ss-file-input').click()">
+              ${hasShot ? 'Replace creative' : 'Upload creative'}
+            </button>
+            <div class="ss-status" id="ad-ss-status"></div>
+            <div class="ss-help">PNG, JPEG, or WebP. Auto-resized to 1600px wide. Max 5MB. For video ads, upload a representative frame.</div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  async function addAd() {
+    await refreshPageAssetsCache();
+    if (_pageAssetsCache.length === 0) {
+      if (!confirm('No page assets exist yet. You can add an ad now, but linking to a landing page requires creating page assets first. Continue anyway?')) {
+        return;
+      }
+    }
+    adFormContainer.innerHTML = buildAdForm(null);
+    adAddBtn.style.display = 'none';
+    document.getElementById('ad-label').focus();
+  }
+
+  async function editAd(id) {
+    try {
+      await refreshPageAssetsCache();
+      const res = await fetch(`/v2/client/${CLIENT_SLUG}/ad-creatives`);
+      const data = await res.json();
+      const ad = (data.ad_creatives || []).find(a => a.id === id);
+      if (!ad) {
+        showFlash('error', 'Ad not found.');
+        return;
+      }
+      adFormContainer.innerHTML = buildAdForm(ad);
+      adAddBtn.style.display = 'none';
+      const fileInput = document.getElementById('ad-ss-file-input');
+      if (fileInput) {
+        fileInput.addEventListener('change', () => handleAdScreenshotUpload(id));
+      }
+      adFormContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } catch (err) {
+      showFlash('error', 'Could not load ad for editing.');
+    }
+  }
+
+  function cancelAdForm() {
+    adFormContainer.innerHTML = '';
+    adAddBtn.style.display = '';
+  }
+
+  async function saveAd() {
+    const form = document.getElementById('ad-form');
+    const editId = form.dataset.adId;
+    const isEdit = editId && editId !== '';
+
+    const lpVal = document.getElementById('ad-landing-page').value;
+    const clicksVal      = document.getElementById('ad-clicks').value;
+    const impressionsVal = document.getElementById('ad-impressions').value;
+    const scoreVal       = document.getElementById('ad-score').value;
+
+    const payload = {
+      platform:              document.getElementById('ad-platform').value,
+      ad_format:             document.getElementById('ad-format').value || null,
+      ad_label:              document.getElementById('ad-label').value.trim(),
+      headline:              document.getElementById('ad-headline').value.trim() || null,
+      primary_text:          document.getElementById('ad-primary-text').value.trim() || null,
+      cta_label:             document.getElementById('ad-cta').value.trim() || null,
+      landing_page_asset_id: lpVal ? parseInt(lpVal) : null,
+      clicks:                clicksVal      === '' ? null : parseInt(clicksVal),
+      impressions:           impressionsVal === '' ? null : parseInt(impressionsVal),
+      superads_score:        scoreVal       === '' ? null : parseInt(scoreVal),
+      notes:                 document.getElementById('ad-notes').value.trim() || null,
+    };
+
+    if (!payload.ad_label) {
+      showFlash('error', 'Ad label is required.');
+      return;
+    }
+    if (!payload.platform) {
+      showFlash('error', 'Platform is required.');
+      return;
+    }
+
+    const url    = isEdit ? `/v2/ad-creatives/${editId}` : `/v2/client/${CLIENT_SLUG}/ad-creatives`;
+    const method = isEdit ? 'PATCH' : 'POST';
+
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showFlash('success', isEdit ? 'Ad updated.' : 'Ad added. Click Edit to upload the creative image.');
+        cancelAdForm();
+        await refreshAds();
+      } else {
+        showFlash('error', data.error || 'Failed to save ad.');
+      }
+    } catch (err) {
+      showFlash('error', 'Network error saving ad.');
+    }
+  }
+
+  async function deleteAd(id) {
+    if (!confirm('Delete this ad creative? This cannot be undone.')) return;
+
+    try {
+      const res = await fetch(`/v2/ad-creatives/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (res.ok) {
+        showFlash('success', 'Ad deleted.');
+        await refreshAds();
+      } else {
+        showFlash('error', data.error || 'Failed to delete ad.');
+      }
+    } catch (err) {
+      showFlash('error', 'Network error deleting ad.');
+    }
+  }
+
+  async function handleAdScreenshotUpload(adId) {
+    const fileInput = document.getElementById('ad-ss-file-input');
+    const status    = document.getElementById('ad-ss-status');
+    const file      = fileInput.files[0];
+    if (!file) return;
+
+    status.className = 'ss-status uploading';
+    status.textContent = 'Compressing…';
+
+    try {
+      const blob = await compressImage(file);
+      status.textContent = `Uploading ${(blob.size / 1024).toFixed(0)} KB…`;
+
+      const formData = new FormData();
+      formData.append('file', blob, 'ad.' + (blob.type === 'image/png' ? 'png' : 'jpg'));
+
+      const res = await fetch(`/v2/ad-creatives/${adId}/screenshot`, {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        status.className = 'ss-status success';
+        status.textContent = 'Uploaded.';
+        const preview = document.getElementById('ad-ss-preview');
+        if (preview) {
+          const newImg = document.createElement('img');
+          newImg.id = 'ad-ss-preview';
+          newImg.className = 'ss-preview';
+          newImg.alt = 'Ad creative';
+          newImg.src = data.ad.screenshot_url + '?t=' + Date.now();
+          preview.replaceWith(newImg);
+        }
+        const btn = adFormContainer.querySelector('.btn-upload');
+        if (btn) btn.textContent = 'Replace creative';
+        await refreshAds();
+      } else {
+        status.className = 'ss-status error';
+        status.textContent = data.error || 'Upload failed.';
+      }
+    } catch (err) {
+      status.className = 'ss-status error';
+      status.textContent = 'Upload error: ' + (err.message || err);
+    } finally {
+      fileInput.value = '';
     }
   }
 
