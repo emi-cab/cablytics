@@ -1,13 +1,11 @@
 """
 Agent prompt templates for CABlytics V2.
 
-Each function returns prompts ready for the Claude API. JSON sanitisation
-(ensure_ascii, regex cleaning) is applied in pipeline.py after each call.
-
-Phase 3 changes:
-  • agent4_prompt now returns a content-blocks list as the user prompt when
-    screenshots are present, so Claude's vision can analyse the screenshots.
-    When no screenshots exist, it returns a plain string user prompt as before.
+Phase 4 changes:
+  • Agent 3 now consumes Google Search Console data — top queries, landing
+    pages, CTR, and positions. This gives the agent direct access to the
+    pre-purchase language people use to find the brand, complementing the
+    post-purchase language in VoC.
   • Other agents unchanged.
 """
 
@@ -215,23 +213,40 @@ def _format_page_assets(page_assets: list[dict]) -> str:
 
 def agent3_prompt(voc_volunteered: str, voc_solicited: str,
                   competitor_notes: str, page_assets: list[dict],
-                  client_context: str) -> tuple[str, str]:
+                  client_context: str,
+                  gsc_summary: str = '') -> tuple[str, str]:
+    """
+    Phase 4: Now consumes Search Console data alongside VoC. GSC gives us
+    the *pre-purchase* search language; VoC gives us the *post-purchase*
+    review language. Comparing the two is one of the highest-value moves
+    Agent 3 can make.
+    """
     system = """You are a consumer psychologist specialising in e-commerce purchase behaviour.
-You analyse Voice of Customer data to surface Category Entry Points (CEPs) — the specific
-moments, emotions, and contexts that trigger someone to seek a product.
+You analyse Voice of Customer data plus Search Console data to surface Category Entry Points
+(CEPs) — the specific moments, emotions, and contexts that trigger someone to seek a product.
 
-You receive two types of VoC and must weight them differently:
+You receive THREE classes of customer language and must weight them differently:
+
+  PRE-PURCHASE SEARCH LANGUAGE (Search Console queries)
+    These are the actual phrases people typed into Google to find this brand.
+    Strong signal for problem framing, intent, and unmet need at the moment of search.
+    Bias: only captures people who already know to search for something — not pure
+    discovery-stage browsers.
 
   VOLUNTEERED VoC (reviews, support tickets, complaints, social mentions)
-    These are unprompted — customers chose to speak. Strong signal for emotional triggers,
+    Unprompted post-purchase or in-experience language. Strong for emotional triggers,
     objections, and post-purchase satisfaction. Selection-biased toward strong opinions.
 
   SOLICITED VoC (surveys, NPS, on-site polls, interviews)
-    These are prompted — customers were asked. Better for structured comparison and
-    mid-funnel intent. Selection-biased toward whoever was willing to fill in a survey.
+    Prompted responses. Better for structured comparison and mid-funnel intent.
+    Selection-biased toward whoever filled in a survey.
 
-When the two sources disagree, note the disagreement explicitly — it usually reveals
-something about who buys vs who responds.
+The most valuable insights come from CONTRAST between these three sources:
+  - When pre-purchase queries use one phrase but post-purchase reviews use a different one,
+    that gap reveals how the brand is positioned vs. how customers actually experience it.
+  - When solicited and volunteered VoC disagree, that reveals who buys vs who responds.
+  - When the page copy uses neither customers' search language nor their review language,
+    that's a copy-gap to flag.
 
 CEPs answer six questions:
 1. With/for whom do they buy?
@@ -242,7 +257,7 @@ CEPs answer six questions:
 6. How are they feeling when they buy?
 
 You write in British English. Every CEP must be supported by verbatim customer quotes,
-and each quote must be tagged with its source ("volunteered" or "solicited").
+and each quote must be tagged with its source ("volunteered", "solicited", or "search_query").
 You never produce demographic personas ("health-conscious millennials") — only specific
 triggering moments.
 
@@ -260,8 +275,8 @@ Your JSON must follow this exact structure:
       "emotional_state": "How they were feeling when they bought",
       "quotes": [
         {"text": "Verbatim customer quote 1", "source": "volunteered"},
-        {"text": "Verbatim customer quote 2", "source": "solicited"},
-        {"text": "Verbatim customer quote 3", "source": "volunteered"}
+        {"text": "Verbatim search query 2",   "source": "search_query"},
+        {"text": "Verbatim survey response 3", "source": "solicited"}
       ],
       "funnel_implication": "Where on the funnel this CEP should be addressed (homepage/PLP/PDP/checkout)"
     }
@@ -280,10 +295,12 @@ Your JSON must follow this exact structure:
   "customer_language": [
     {
       "phrase": "Exact phrase customers use",
+      "source": "volunteered|solicited|search_query",
       "meaning": "What they mean by it",
       "use_in_copy": "Which page type this phrase should appear on (homepage/PLP/PDP/checkout)"
     }
   ],
+  "search_vs_review_gap": "One paragraph identifying where the pre-purchase search language differs from the post-purchase review language. What does this gap reveal about positioning, expectation-setting, or the buying journey? If GSC data is unavailable, omit this field.",
   "voc_source_disagreements": [
     {
       "topic": "What the two VoC sources disagree about",
@@ -292,19 +309,34 @@ Your JSON must follow this exact structure:
       "implication": "What this disagreement reveals"
     }
   ],
-  "copy_gap_analysis": "One paragraph comparing the current page copy (across all provided pages) against the top CEPs. Where is the gap between what customers say drives purchase and what the copy currently says? Reference specific pages by their type (e.g. 'the PDP says X, but customers describe it as Y').",
+  "high_intent_low_ctr_queries": [
+    {
+      "query": "The exact search query",
+      "impressions": 1234,
+      "ctr": 0.012,
+      "diagnosis": "Why this query is showing the brand but not converting clicks — title tag, meta description, ranking position, or off-CEP copy"
+    }
+  ],
+  "copy_gap_analysis": "One paragraph comparing the current page copy (across all provided pages) against the top CEPs and the search queries. Where is the gap between what customers say drives purchase, what they searched for, and what the copy currently says?",
   "summary": "2-3 sentence plain English summary of the most important CEP insights."
-}"""
+}
+
+If GSC data is not configured or unavailable, omit the `search_vs_review_gap` and
+`high_intent_low_ctr_queries` fields (or make them empty).
+"""
 
     pages_block = _format_page_assets(page_assets)
 
-    user = f"""Analyse the following Voice of Customer data and surface the top Category Entry Points.
+    user = f"""Analyse the following customer-language data and surface the top Category Entry Points.
 
 BUSINESS CONTEXT:
 {client_context or 'No specific business context provided.'}
 
 CURRENT PAGE COPY (tagged by page type):
 {pages_block}
+
+SEARCH CONSOLE DATA:
+{gsc_summary or 'Search Console: not configured for this client.'}
 
 VOLUNTEERED VoC (reviews, support tickets, complaints, social):
 {voc_volunteered or 'No volunteered VoC provided.'}
@@ -315,10 +347,15 @@ SOLICITED VoC (surveys, NPS, polls, interviews):
 COMPETITOR NOTES:
 {competitor_notes or 'No competitor notes provided.'}
 
-Identify the top 3 CEPs. For each, provide 3 verbatim quotes as evidence, tagged by source.
+Identify the top 3 CEPs. For each, provide 3 verbatim quotes as evidence, tagged by source
+(volunteered, solicited, or search_query).
 Identify the top 3 objections that almost stopped the purchase.
-Extract the exact language customers use to describe the benefit (not the feature).
-Where the two VoC sources disagree, surface the disagreement explicitly.
+Extract the exact language customers use — across all sources — to describe the benefit (not the feature).
+
+Where the search language differs from the review language, surface that gap explicitly.
+Where solicited and volunteered VoC disagree, surface that too.
+For any high-impression, low-CTR Search Console queries, diagnose what's preventing the click.
+
 Output your JSON now."""
 
     return system, user
@@ -329,13 +366,11 @@ Output your JSON now."""
 def agent4_prompt(agent3_output: dict, page_assets: list[dict],
                   client_context: str):
     """
-    Phase 3: Returns (system_prompt, user_content) where user_content is either:
+    Returns (system_prompt, user_content) where user_content is either:
       • a plain string when no page assets have screenshots, or
-      • a list of content blocks (text + image URLs) when screenshots are
-        present, so Claude's vision can analyse them.
+      • a list of content blocks (text + image URLs) when screenshots exist.
 
-    Pipeline.py's _call_claude detects the type and constructs the API call
-    accordingly.
+    Pipeline.py's _call_claude detects the type and constructs the API call accordingly.
     """
     import json
 
@@ -375,7 +410,7 @@ Your JSON must follow this exact structure:
   "visual_observations": [
     {
       "page_type": "Which page",
-      "observation": "One specific visual finding (CTA buried below fold, hero image lacks human face, trust badges absent, etc.)",
+      "observation": "One specific visual finding",
       "impact": "How this affects conversion"
     }
   ],
@@ -441,16 +476,12 @@ additional_page_suggestions — but keep that list short (max 3 items) and concr
 No vague superlatives. No fake urgency. Use the exact customer language from the research.
 """
 
-    # Find page assets that have screenshots
     assets_with_images = [a for a in (page_assets or []) if a.get("screenshot_url")]
 
     if not assets_with_images:
-        # Plain string user prompt — no images
         user_content = intro_text + "\nOutput your JSON now."
         return system, user_content
 
-    # Build content-blocks message: intro text, then each image with a label,
-    # then closing instructions.
     blocks = [{"type": "text", "text": intro_text}]
 
     for a in assets_with_images:

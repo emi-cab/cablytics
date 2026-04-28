@@ -1,17 +1,10 @@
 """
 CABlytics V2 — Five-agent pipeline orchestrator.
 
-Execution order:
-  Agents 1 + 3 run in parallel (independent data sources)
-  Agent 2 runs after Agent 1
-  Agent 4 runs after Agent 3
-  Agent 5 runs after Agent 2
-
-Phase 3 changes:
-  • _call_claude now accepts either a string user prompt (most agents) or a
-    list of content blocks (Agent 4 when screenshots are present).
-  • Agent 4 enriches its page assets with public screenshot URLs before
-    handing them to the prompt builder, so Claude can vision-analyse the pages.
+Phase 4 changes:
+  • Agent 3 now collects Search Console data (gsc_queries.collect_gsc_data)
+    when the client has a gsc_site_url configured. GSC failures are non-fatal
+    — Agent 3 still runs with VoC only on error.
 """
 
 import os
@@ -30,6 +23,7 @@ from v2.db import (
     list_page_assets,
 )
 from v2.ga4_queries_v2 import collect_funnel_data, build_funnel_summary
+from v2.gsc_queries import collect_gsc_data, build_gsc_summary
 from v2.prompts_v2 import (
     agent1_prompt,
     agent2_prompt,
@@ -51,19 +45,10 @@ def _get_claude_client() -> anthropic.Anthropic:
 
 def _call_claude(system: str, user, agent_num: int) -> dict:
     """
-    Make a single Claude API call and return parsed JSON.
-
-    `user` can be either:
-      • a string — sent as a plain text user message (most agents), or
-      • a list of content blocks — used by Agent 4 when screenshots are
-        present, to enable vision analysis.
-
-    Applies JSON sanitisation (ensure_ascii + regex) on the response.
-    Raises ValueError if the response cannot be parsed as JSON.
+    `user` can be a string OR a list of content blocks (Agent 4 vision).
     """
     client = _get_claude_client()
 
-    # Build the message content depending on whether user is text or blocks
     if isinstance(user, list):
         message_content = user
         image_count = sum(1 for b in user if isinstance(b, dict) and b.get("type") == "image")
@@ -99,7 +84,6 @@ def _call_claude(system: str, user, agent_num: int) -> dict:
 
 
 def _enrich_page_assets_with_urls(page_assets: list[dict]) -> list[dict]:
-    """Attach public screenshot URL to each asset that has a screenshot_path."""
     enriched = []
     for a in page_assets:
         copy = dict(a)
@@ -159,20 +143,35 @@ def run_agent2(agent1_output: dict, client_data: dict, report_id: int) -> dict:
 
 
 def run_agent3(client_data: dict, report_id: int) -> dict:
-    """Consumer Researcher — mines VoC and surfaces CEPs."""
+    """Consumer Researcher — mines VoC + GSC and surfaces CEPs."""
     client_id        = client_data["id"]
     voc_volunteered  = client_data.get("voc_volunteered", "")
     voc_solicited    = client_data.get("voc_solicited", "")
     competitor_notes = client_data.get("competitor_notes", "")
     context          = client_data.get("client_context", "")
+    gsc_site_url     = client_data.get("gsc_site_url", "")
 
     page_assets = list_page_assets(client_id)
 
-    log_event(client_id, "agent_started", report_id=report_id, agent_number=3,
-              message=f"Analysing VoC ({len(page_assets)} page assets)")
+    # GSC enrichment — non-fatal on failure
+    gsc_summary = ""
+    if gsc_site_url:
+        log_event(client_id, "agent_started", report_id=report_id, agent_number=3,
+                  message=f"Fetching Search Console data for {gsc_site_url}")
+        gsc_data = collect_gsc_data(gsc_site_url, days=28)
+        gsc_summary = build_gsc_summary(gsc_data)
+        if gsc_data.get("error"):
+            log_event(client_id, "agent_started", report_id=report_id, agent_number=3,
+                      message=f"GSC unavailable — continuing without it: {gsc_data['error']}")
 
-    system, user = agent3_prompt(voc_volunteered, voc_solicited,
-                                 competitor_notes, page_assets, context)
+    log_event(client_id, "agent_started", report_id=report_id, agent_number=3,
+              message=f"Analysing VoC ({len(page_assets)} page assets, "
+                      f"GSC: {'on' if gsc_site_url else 'off'})")
+
+    system, user = agent3_prompt(
+        voc_volunteered, voc_solicited, competitor_notes,
+        page_assets, context, gsc_summary
+    )
     output = _call_claude(system, user, agent_num=3)
 
     update_report_agent(report_id, 3, output)

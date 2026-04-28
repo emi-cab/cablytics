@@ -564,6 +564,13 @@
           <input type="text" id="ga4_property_id" name="ga4_property_id" value="{{ client.ga4_property_id }}" required>
         </div>
         <div class="field" style="grid-column: span 2">
+          <label for="gsc_site_url">Search Console property <span class="hint">optional — exact URL or sc-domain:host</span></label>
+          <input type="text" id="gsc_site_url" name="gsc_site_url" value="{{ client.gsc_site_url or '' }}" placeholder="e.g. https://www.fitnessfirst.co.uk/  OR  sc-domain:fitnessfirst.co.uk">
+          <div class="slug-display">
+            Service account must be added as a Restricted user in Search Console for this property.
+          </div>
+        </div>
+        <div class="field" style="grid-column: span 2">
           <label for="client_context">Business context <span class="hint">used in all AI prompts</span></label>
           <input type="text" id="client_context" name="client_context" value="{{ client.client_context or '' }}">
           <div class="slug-display">
@@ -1118,6 +1125,7 @@
     const payload = {
       client_name:        document.getElementById('client_name').value.trim(),
       ga4_property_id:    document.getElementById('ga4_property_id').value.trim(),
+      gsc_site_url:       document.getElementById('gsc_site_url').value.trim(),
       client_context:     document.getElementById('client_context').value.trim(),
       session_insights:   document.getElementById('session_insights').value.trim(),
       voc_volunteered:    document.getElementById('voc_volunteered').value.trim(),
