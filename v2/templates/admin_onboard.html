@@ -3,23 +3,35 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CABlytics V2 — New client</title>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <title>CABlytics — New client</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;1,9..144,400&family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --ink:       #0f0f10;
-      --ink-2:     #3a3a3f;
-      --ink-3:     #7a7a85;
-      --surface:   #f7f7f5;
-      --surface-2: #efefec;
-      --border:    #ddddd8;
-      --accent:    #1a1a2e;
-      --accent-2:  #e63946;
-      --mono:      'DM Mono', monospace;
-      --sans:      'DM Sans', sans-serif;
-      --radius:    6px;
+      --ink-headline: #000000;
+      --ink:          #272727;
+      --ink-2:        #494949;
+      --ink-3:        #C1C1C1;
+      --ink-on-dark:  #FFFFFF;
+      --surface:      #F9F9FA;
+      --surface-2:    #E5E5E5;
+      --border:       #E5E5E5;
+      --accent:       #066060;
+      --accent-light: #66E2E3;
+      --accent-2:     #FF5252;
+      --brand-yellow:      #F0FF2A;
+      --brand-yellow-dark: #454601;
+      --brand-green:       #9DF204;
+      --brand-green-dark:  #254A02;
+      --serif:  'Fraunces', Georgia, serif;
+      --sans:   'Geist', system-ui, sans-serif;
+      --mono:   'Geist Mono', monospace;
+      --radius:      8px;
+      --radius-pill: 20px;
       --transition: 180ms ease;
     }
 
@@ -33,38 +45,50 @@
       padding: 0 0 80px;
     }
 
+    h1, h2, h3, h4 { font-family: var(--serif); }
+
     /* ── Header ── */
     .header {
-      background: var(--accent);
-      padding: 28px 48px;
+      background: var(--ink-headline);
+      padding: 0 48px;
+      height: 60px;
       display: flex;
-      align-items: baseline;
+      align-items: center;
       gap: 16px;
       position: sticky;
       top: 0;
       z-index: 10;
     }
     .header-logo {
-      font-family: var(--mono);
-      font-size: 1.1rem;
-      font-weight: 500;
-      color: #fff;
-      letter-spacing: 0.04em;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--ink-on-dark);
+      text-decoration: none;
     }
+    .header-logo svg { width: 56px; height: auto; display: block; }
+    .header-logo-suffix {
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      text-transform: lowercase;
+    }
+    .header-sep { color: rgba(255,255,255,0.25); }
     .header-badge {
       font-family: var(--mono);
       font-size: 0.7rem;
-      color: var(--accent-2);
+      color: var(--brand-yellow);
       letter-spacing: 0.08em;
       text-transform: uppercase;
-      border: 1px solid var(--accent-2);
-      padding: 2px 7px;
-      border-radius: 20px;
+      border: 1px solid var(--brand-yellow);
+      padding: 2px 8px;
+      border-radius: var(--radius-pill);
     }
     .header-sub {
       margin-left: auto;
       font-size: 0.8rem;
-      color: rgba(255,255,255,0.4);
+      color: rgba(255,255,255,0.5);
       font-family: var(--mono);
     }
 
@@ -76,17 +100,19 @@
     }
 
     .page-title {
-      font-size: 1.75rem;
+      font-family: var(--serif);
+      font-size: 2.25rem;
       font-weight: 300;
-      color: var(--ink);
-      letter-spacing: -0.02em;
+      color: var(--ink-headline);
+      letter-spacing: -0.025em;
+      line-height: 1.1;
       margin-bottom: 6px;
     }
-    .page-title span { font-weight: 500; }
+    .page-title span { font-weight: 400; font-style: italic; color: var(--accent); }
 
     .page-desc {
       font-size: 0.875rem;
-      color: var(--ink-3);
+      color: var(--ink-2);
       margin-bottom: 44px;
       line-height: 1.6;
     }
@@ -120,17 +146,18 @@
     .section-num {
       font-family: var(--mono);
       font-size: 0.7rem;
-      color: var(--accent-2);
-      background: #fdf0f1;
-      border: 1px solid #f5c6ca;
-      padding: 2px 8px;
-      border-radius: 20px;
+      color: var(--accent);
+      background: rgba(102,226,227,0.2);
+      border: 1px solid rgba(102,226,227,0.5);
+      padding: 2px 9px;
+      border-radius: var(--radius-pill);
       flex-shrink: 0;
     }
     .section-title {
-      font-size: 0.95rem;
-      font-weight: 500;
-      color: var(--ink);
+      font-family: var(--serif);
+      font-size: 1.15rem;
+      font-weight: 400;
+      color: var(--ink-headline);
       letter-spacing: -0.01em;
     }
     .section-note {
@@ -190,10 +217,10 @@
     select:focus,
     textarea:focus {
       border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(26,26,46,0.08);
+      box-shadow: 0 0 0 3px rgba(6,96,96,0.12);
     }
     input::placeholder,
-    textarea::placeholder { color: #bbbbb5; }
+    textarea::placeholder { color: var(--ink-3); }
 
     textarea { resize: vertical; line-height: 1.55; }
 
@@ -216,6 +243,14 @@
     }
     .slug-preview.active { color: var(--accent); }
 
+    /* ── URL counter ── */
+    .field-meta {
+      font-size: 0.73rem;
+      color: var(--ink-3);
+      font-family: var(--mono);
+      margin-top: 3px;
+    }
+
     /* ── Char counter ── */
     .char-counter {
       text-align: right;
@@ -226,23 +261,6 @@
     }
     .char-counter.warn { color: #f59e0b; }
     .char-counter.full { color: var(--accent-2); }
-
-    /* ── Phase 2 placeholder note ── */
-    .phase-note {
-      background: #fffbeb;
-      border: 1px solid #fde68a;
-      border-radius: var(--radius);
-      padding: 10px 14px;
-      font-size: 0.78rem;
-      color: #78350f;
-      line-height: 1.5;
-    }
-    .phase-note strong {
-      font-family: var(--mono);
-      font-size: 0.7rem;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-    }
 
     /* ── Divider ── */
     .divider {
@@ -264,30 +282,36 @@
       font-size: 0.82rem;
       font-weight: 500;
       letter-spacing: 0.04em;
-      color: #fff;
+      color: var(--ink-on-dark);
       background: var(--accent);
-      border: none;
+      border: 1px solid var(--accent);
       border-radius: var(--radius);
       padding: 11px 28px;
       cursor: pointer;
-      transition: background var(--transition), transform 80ms ease;
+      transition: background var(--transition), color var(--transition), border-color var(--transition), transform 80ms ease;
     }
-    .btn-primary:hover { background: #2a2a4a; }
+    .btn-primary:hover {
+      background: var(--brand-yellow);
+      color: var(--brand-yellow-dark);
+      border-color: var(--brand-yellow);
+    }
     .btn-primary:active { transform: scale(0.98); }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-primary:disabled:hover { background: var(--accent); color: var(--ink-on-dark); border-color: var(--accent); }
 
     .btn-secondary {
       font-family: var(--mono);
       font-size: 0.82rem;
-      color: var(--ink-3);
+      color: var(--ink-2);
       background: none;
       border: 1px solid var(--border);
       border-radius: var(--radius);
       padding: 10px 20px;
       cursor: pointer;
-      transition: border-color var(--transition), color var(--transition);
+      transition: border-color var(--transition), color var(--transition), background var(--transition);
       text-decoration: none;
     }
-    .btn-secondary:hover { border-color: var(--ink-3); color: var(--ink); }
+    .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
 
     .submit-note {
       font-size: 0.75rem;
@@ -304,13 +328,13 @@
       margin-bottom: 28px;
       display: none;
     }
-    .flash.success { background: #ecfdf5; border: 1px solid #6ee7b7; color: #065f46; }
-    .flash.error   { background: #fef2f2; border: 1px solid #fca5a5; color: #991b1b; }
+    .flash.success { background: rgba(157,242,4,0.15); border: 1px solid rgba(157,242,4,0.5); color: var(--brand-green-dark); }
+    .flash.error   { background: rgba(255,82,82,0.1);  border: 1px solid rgba(255,82,82,0.4); color: var(--accent-2); }
     .flash.show    { display: block; }
 
     /* ── Responsive ── */
     @media (max-width: 620px) {
-      .header { padding: 20px 24px; }
+      .header { padding: 0 24px; }
       .page { padding: 36px 20px 0; }
       .grid-2, .grid-3 { grid-template-columns: 1fr; }
       .span-2 { grid-column: span 1; }
@@ -320,14 +344,20 @@
 <body>
 
 <header class="header">
-  <span class="header-logo">CABlytics</span>
-  <span class="header-badge">V2</span>
+  <a href="/v2/admin/clients" class="header-logo" aria-label="CABlytics">
+    <svg viewBox="0 0 94 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path d="M91.4198 12.4479H91.4176C90.7213 12.0575 89.8797 11.8492 88.863 11.79V11.609C91.3866 10.4994 92.6362 8.78646 92.6362 6.44644C92.6362 2.75772 89.7622 0.746621 84.5365 0.746621H62.8607C62.6356 0.746621 62.4538 0.935553 62.4538 1.16773V19.1731L56.259 1.05164C56.198 0.86954 56.0306 0.747759 55.8454 0.747759H37.0514C36.8651 0.747759 36.6988 0.868402 36.6378 1.05051L31.9842 14.6115C31.9764 14.6115 31.9698 14.6081 31.962 14.6081H19.7287C19.4925 14.6081 19.3007 14.805 19.2952 15.0497C19.2752 16.3027 19.1555 17.2622 18.9215 17.8813C18.458 19.2016 17.4989 19.8606 16.0187 19.8606C14.5385 19.8606 13.5528 19.2608 13.0305 18.0612C12.5948 17.0721 12.3919 15.0303 12.3919 11.9402C12.3919 8.67037 12.5937 6.56936 13.0305 5.69982C13.5239 4.68004 14.5385 4.16901 16.0187 4.16901C16.745 4.16901 17.4125 4.4103 17.9624 4.85987C18.4558 5.25139 18.7741 5.66909 18.9193 6.18125C19.151 6.95177 19.2919 7.8896 19.3196 8.99018C19.3251 9.23033 19.5192 9.42268 19.752 9.42268H31.524C31.7746 9.42268 31.972 9.20415 31.9576 8.94693C31.8301 6.63537 31.3744 4.8997 30.6159 3.69327C29.5715 2.0441 27.7131 0.993598 25.0731 0.512164C23.2159 0.180965 20.139 0 15.9888 0C11.8386 0 8.82154 0.180965 6.93438 0.509888C3.88853 1.07668 1.85723 2.42766 0.900339 4.58785C0.290503 5.99801 0 8.45981 0 11.9994C0 15.5391 0.290503 17.9997 0.900339 19.4099C1.85723 21.5712 3.88964 22.921 6.9366 23.4901C8.82265 23.819 11.8408 24 15.9899 24C20.139 24 23.187 23.8179 25.0742 23.4901C27.0179 23.1362 28.5347 22.4726 29.618 21.5018L29.1435 22.8835C29.0426 23.1805 29.2543 23.4912 29.5582 23.4912H40.7514C40.9399 23.4912 41.1062 23.3672 41.1672 23.184L42.0066 20.6766C42.0675 20.4922 42.235 20.3705 42.4224 20.3705H50.4456C50.6307 20.3705 50.7971 20.49 50.8591 20.6721L51.7262 23.1885C51.7872 23.3706 51.9546 23.4912 52.1409 23.4912H85.7584C91.2435 23.4912 94 21.4517 94 17.368C94 14.9973 93.1285 13.3777 91.4187 12.4479H91.4198ZM48.4265 15.3296H43.8228L46.4351 7.64718L49.0474 15.3296H48.4265ZM74.8767 5.70551H78.6998C79.5757 5.70551 80.2865 6.43961 80.2865 7.34784C80.2865 7.80196 80.1079 8.21169 79.823 8.50989C79.5358 8.80694 79.1389 8.99018 78.6998 8.99018H74.8767V5.70437V5.70551ZM80.6679 17.6321H80.6657C80.3796 17.928 79.9816 18.1124 79.5425 18.1124H74.8767V14.8266H79.5425C80.4206 14.8266 81.1314 15.5607 81.1314 16.4689C81.1314 16.9242 80.9529 17.335 80.6679 17.631V17.6321Z" fill="currentColor"/>
+    </svg>
+    <span class="header-logo-suffix">lytics</span>
+  </a>
+  <span class="header-sep">/</span>
+  <span class="header-badge">New client</span>
   <span class="header-sub">internal · admin only</span>
 </header>
 
 <main class="page">
   <h1 class="page-title">Register <span>new client</span></h1>
-  <p class="page-desc">Fill in all required fields to onboard a client to the V2 pipeline. The GA4 service account must already have Viewer access to the client's property before running the first report. Page-specific URLs and copy will be added separately once the page-assets editor ships in Phase 2 — for now, GA4 will be queried in site-wide mode.</p>
+  <p class="page-desc">Fill in all required fields to onboard a client to the V2 pipeline. The GA4 service account must already have Viewer access to the client's property before running the first report.</p>
 
   <div id="flash" class="flash"></div>
 
@@ -360,10 +390,23 @@
       </div>
     </div>
 
-    <!-- 2. Session insights -->
+    <!-- 2. GA4 scope -->
     <div class="section">
       <div class="section-header">
         <span class="section-num">02</span>
+        <span class="section-title">GA4 scope</span>
+      </div>
+      <div class="field">
+        <label for="target_urls">Target URLs <span class="hint">one per line</span></label>
+        <textarea id="target_urls" name="target_urls" rows="5" placeholder="/gym-locations/london&#10;/membership/join&#10;/classes&#10;/personal-training"></textarea>
+        <div class="field-meta" id="url-count">0 URLs</div>
+      </div>
+    </div>
+
+    <!-- 3. Session insights -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-num">03</span>
         <span class="section-title">Session recording insights</span>
         <span class="section-note">Clarity Copilot / Hotjar observations</span>
       </div>
@@ -373,49 +416,32 @@
       </div>
     </div>
 
-    <!-- 3. Voice of Customer -->
+    <!-- 4. Consumer research inputs -->
     <div class="section">
       <div class="section-header">
         <span class="section-num">03</span>
-        <span class="section-title">Voice of Customer</span>
-        <span class="section-note">Agent 3 inputs — split by source type</span>
+        <span class="section-title">Consumer research inputs</span>
+        <span class="section-note">Agent 3 data — set once, update periodically</span>
       </div>
-
       <div class="field" style="margin-bottom:16px">
-        <label for="voc_volunteered">Volunteered VoC <span class="hint">reviews, support tickets, complaints, social mentions</span></label>
-        <textarea id="voc_volunteered" name="voc_volunteered" rows="8" placeholder="Paste Trustpilot / Google / Amazon reviews, support ticket excerpts, or social mentions here. One item per paragraph is fine — no formatting needed."></textarea>
-        <div class="char-counter" id="voc-volunteered-counter">0 chars</div>
+        <label for="customer_reviews">Customer reviews <span class="hint">100–300 reviews, plain text</span></label>
+        <textarea id="customer_reviews" name="customer_reviews" rows="8" placeholder="Paste Trustpilot / Google / Amazon reviews here. One review per paragraph is fine — no formatting needed."></textarea>
+        <div class="char-counter" id="reviews-counter">0 chars</div>
       </div>
-
       <div class="field" style="margin-bottom:16px">
-        <label for="voc_solicited">Solicited VoC <span class="hint">surveys, NPS, on-site polls, interview transcripts</span></label>
-        <textarea id="voc_solicited" name="voc_solicited" rows="8" placeholder="Paste survey responses, NPS verbatims, on-site poll answers, or interview snippets here. One response per paragraph is fine."></textarea>
-        <div class="char-counter" id="voc-solicited-counter">0 chars</div>
-      </div>
-
-      <div class="field">
         <label for="competitor_notes">Competitor notes <span class="hint">optional</span></label>
-        <textarea id="competitor_notes" name="competitor_notes" rows="4" placeholder="Paste competitor review snippets, switching reasons observed on forums or Reddit, or notes on differentiation."></textarea>
+        <textarea id="competitor_notes" name="competitor_notes" rows="4" placeholder="Paste competitor review snippets or switching reasons observed on forums / Reddit."></textarea>
       </div>
-    </div>
-
-    <!-- 4. Page assets placeholder (Phase 2) -->
-    <div class="section">
-      <div class="section-header">
-        <span class="section-num">04</span>
-        <span class="section-title">Page assets</span>
-        <span class="section-note">coming in Phase 2</span>
-      </div>
-      <div class="phase-note">
-        <strong>Phase 2 — not yet available.</strong><br>
-        Tagged page URLs and copy (homepage, PLP, PDP, cart, checkout, etc.) will be managed here once the page-assets editor ships. Until then, Agent 1 queries GA4 in site-wide mode and Agent 4 generates copy using only the business context above.
+      <div class="field">
+        <label for="current_pdp_copy">Current PDP / homepage copy <span class="hint">headline + first paragraph</span></label>
+        <textarea id="current_pdp_copy" name="current_pdp_copy" rows="4" placeholder="Paste the current homepage headline and first paragraph, or the key PDP headline and opening copy."></textarea>
       </div>
     </div>
 
     <!-- 5. Test sizing -->
     <div class="section">
       <div class="section-header">
-        <span class="section-num">05</span>
+        <span class="section-num">04</span>
         <span class="section-title">Test sizing</span>
         <span class="section-note">Used by Agent 5 for calendar sizing</span>
       </div>
@@ -434,7 +460,7 @@
     <!-- 6. Schedule -->
     <div class="section">
       <div class="section-header">
-        <span class="section-num">06</span>
+        <span class="section-num">05</span>
         <span class="section-title">Report schedule</span>
       </div>
       <div class="grid-3">
@@ -464,7 +490,7 @@
       </div>
     </div>
 
-    <!-- Submit -->
+    <!-- 7. Submit -->
     <div class="section">
       <div class="divider"></div>
       <div class="submit-area">
@@ -481,12 +507,10 @@
   const nameEl   = document.getElementById('client_name');
   const slugEl   = document.getElementById('client_slug');
   const preview  = document.getElementById('slug-preview');
-
-  const vocVolEl     = document.getElementById('voc_volunteered');
-  const vocVolCount  = document.getElementById('voc-volunteered-counter');
-  const vocSolEl     = document.getElementById('voc_solicited');
-  const vocSolCount  = document.getElementById('voc-solicited-counter');
-
+  const urlsEl   = document.getElementById('target_urls');
+  const urlCount = document.getElementById('url-count');
+  const reviewsEl     = document.getElementById('customer_reviews');
+  const reviewCounter = document.getElementById('reviews-counter');
   const submitBtn  = document.getElementById('submit-btn');
   const submitNote = document.getElementById('submit-note');
   const flash      = document.getElementById('flash');
@@ -525,17 +549,17 @@
     }
   }
 
-  function bindCharCounter(el, counter) {
-    el.addEventListener('input', () => {
-      const len = el.value.length;
-      counter.textContent = len.toLocaleString() + ' chars';
-      counter.classList.toggle('warn', len > 8000 && len <= 12000);
-      counter.classList.toggle('full', len > 12000);
-    });
-  }
+  urlsEl.addEventListener('input', () => {
+    const lines = urlsEl.value.split('\n').filter(l => l.trim().length > 0);
+    urlCount.textContent = lines.length + (lines.length === 1 ? ' URL' : ' URLs');
+  });
 
-  bindCharCounter(vocVolEl, vocVolCount);
-  bindCharCounter(vocSolEl, vocSolCount);
+  reviewsEl.addEventListener('input', () => {
+    const len = reviewsEl.value.length;
+    reviewCounter.textContent = len.toLocaleString() + ' chars';
+    reviewCounter.classList.toggle('warn', len > 8000 && len <= 12000);
+    reviewCounter.classList.toggle('full', len > 12000);
+  });
 
   function updateScheduleDay() {
     const freq  = document.getElementById('report_frequency').value;
@@ -579,11 +603,12 @@
       client_name:        document.getElementById('client_name').value.trim(),
       client_slug:        document.getElementById('client_slug').value.trim(),
       ga4_property_id:    document.getElementById('ga4_property_id').value.trim(),
-      client_context:     document.getElementById('client_context').value.trim(),
       session_insights:   document.getElementById('session_insights').value.trim(),
-      voc_volunteered:    document.getElementById('voc_volunteered').value.trim(),
-      voc_solicited:      document.getElementById('voc_solicited').value.trim(),
+      client_context:     document.getElementById('client_context').value.trim(),
+      target_urls:        document.getElementById('target_urls').value.trim(),
+      customer_reviews:   document.getElementById('customer_reviews').value.trim(),
       competitor_notes:   document.getElementById('competitor_notes').value.trim(),
+      current_pdp_copy:   document.getElementById('current_pdp_copy').value.trim(),
       monthly_traffic:    parseInt(document.getElementById('monthly_traffic').value) || null,
       dev_hours_per_week: parseInt(document.getElementById('dev_hours_per_week').value) || null,
       report_frequency:   document.getElementById('report_frequency').value,
@@ -605,8 +630,8 @@
         slugManuallyEdited = false;
         preview.textContent = 'cablytics.onrender.com/v2/dashboard/…';
         preview.classList.remove('active');
-        vocVolCount.textContent = '0 chars';
-        vocSolCount.textContent = '0 chars';
+        urlCount.textContent = '0 URLs';
+        reviewCounter.textContent = '0 chars';
         submitNote.textContent = 'Client saved successfully';
       } else {
         showFlash('error', data.error || 'Something went wrong. Check the Render logs.');
