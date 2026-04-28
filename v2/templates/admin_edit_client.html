@@ -179,20 +179,168 @@
     .char-counter.warn { color: #f59e0b; }
     .char-counter.full { color: var(--accent-2); }
 
-    .phase-note {
-      background: #fffbeb;
-      border: 1px solid #fde68a;
+    /* ── Page assets list ─────────────────────────────────────────────── */
+    .assets-empty {
+      background: var(--surface-2);
+      border: 1px dashed var(--border);
       border-radius: var(--radius);
-      padding: 10px 14px;
-      font-size: 0.78rem;
-      color: #78350f;
-      line-height: 1.5;
+      padding: 22px 18px;
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--ink-3);
     }
-    .phase-note strong {
+
+    .asset-card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+      margin-bottom: 12px;
+      transition: border-color var(--transition);
+    }
+    .asset-card:hover { border-color: #c8c8c2; }
+
+    .asset-card-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .asset-type-tag {
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      background: var(--accent);
+      color: #fff;
+      padding: 3px 9px;
+      border-radius: 20px;
+      flex-shrink: 0;
+    }
+    .asset-type-tag.homepage { background: #1e3a8a; }
+    .asset-type-tag.plp      { background: #047857; }
+    .asset-type-tag.pdp      { background: #b45309; }
+    .asset-type-tag.cart     { background: #6d28d9; }
+    .asset-type-tag.checkout { background: var(--accent-2); }
+    .asset-type-tag.category { background: #0e7490; }
+    .asset-type-tag.other    { background: var(--ink-3); }
+
+    .asset-label {
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--ink);
+      flex: 1;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .asset-actions {
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .asset-action-btn {
       font-family: var(--mono);
       font-size: 0.7rem;
-      letter-spacing: 0.05em;
+      color: var(--ink-3);
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 4px 10px;
+      cursor: pointer;
+      transition: border-color var(--transition), color var(--transition);
+    }
+    .asset-action-btn:hover { border-color: var(--ink-3); color: var(--ink); }
+    .asset-action-btn.danger:hover {
+      border-color: var(--accent-2);
+      color: var(--accent-2);
+    }
+
+    .asset-url {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: var(--ink-3);
+      word-break: break-all;
+      margin-bottom: 8px;
+    }
+    .asset-copy-preview {
+      font-size: 0.78rem;
+      color: var(--ink-2);
+      line-height: 1.5;
+      max-height: 4.5em;
+      overflow: hidden;
+      position: relative;
+      white-space: pre-wrap;
+    }
+    .asset-copy-empty {
+      font-size: 0.75rem;
+      color: var(--ink-3);
+      font-style: italic;
+    }
+
+    /* ── Asset edit form (shown when adding/editing) ──────────────────── */
+    .asset-form {
+      background: #fff;
+      border: 1px solid var(--accent);
+      border-radius: var(--radius);
+      padding: 18px;
+      margin-bottom: 12px;
+      box-shadow: 0 0 0 3px rgba(26,26,46,0.04);
+    }
+    .asset-form-title {
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      letter-spacing: 0.04em;
+      color: var(--ink-2);
       text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    .asset-form-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .btn-asset-save {
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      color: #fff;
+      background: var(--accent);
+      border: none;
+      border-radius: var(--radius);
+      padding: 8px 18px;
+      cursor: pointer;
+    }
+    .btn-asset-save:hover { background: #2a2a4a; }
+    .btn-asset-cancel {
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      color: var(--ink-3);
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 8px 14px;
+      cursor: pointer;
+    }
+    .btn-asset-cancel:hover { border-color: var(--ink-3); color: var(--ink); }
+
+    .btn-add-asset {
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      color: var(--accent);
+      background: #fff;
+      border: 1px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 11px 16px;
+      cursor: pointer;
+      width: 100%;
+      transition: border-color var(--transition), background var(--transition);
+    }
+    .btn-add-asset:hover {
+      border-color: var(--accent);
+      border-style: solid;
+      background: #fafafa;
     }
 
     .divider {
@@ -284,7 +432,7 @@
 
 <main class="page">
   <h1 class="page-title">Edit <span>{{ client.client_name }}</span></h1>
-  <p class="page-desc">Update client settings, Voice of Customer inputs, or scheduling. Changes take effect on the next report run. Page assets (tagged URLs and copy) are coming in Phase 2.</p>
+  <p class="page-desc">Update client settings, Voice of Customer inputs, page assets, or scheduling. Changes take effect on the next report run.</p>
 
   <div id="flash" class="flash"></div>
 
@@ -359,18 +507,45 @@
       <div class="section-header">
         <span class="section-num">04</span>
         <span class="section-title">Page assets</span>
-        <span class="section-note">{{ page_assets|length }} configured · Phase 2 editor coming</span>
+        <span class="section-note" id="assets-count-note">{{ page_assets|length }} configured</span>
       </div>
-      {% if page_assets %}
-        <div class="phase-note">
-          {{ page_assets|length }} page asset(s) configured for this client. The full editor (add / edit / remove pages, upload screenshots) ships in Phase 2.
-        </div>
-      {% else %}
-        <div class="phase-note">
-          <strong>Phase 2 — not yet available.</strong><br>
-          Tagged page URLs and copy (homepage, PLP, PDP, cart, checkout, etc.) will be managed here once the page-assets editor ships. Until then, Agent 1 queries GA4 in site-wide mode and Agent 4 generates copy using only the business context.
-        </div>
-      {% endif %}
+
+      <p class="page-desc" style="margin-bottom:18px; font-size:0.82rem">
+        Tag the key pages in this client's funnel. Agent 1 uses the URLs to filter GA4. Agent 3 and Agent 4 use the page type and copy to focus their analysis. 3–5 pages is the recommended sweet spot.
+      </p>
+
+      <div id="asset-form-container"></div>
+
+      <div id="assets-list">
+        {% if page_assets %}
+          {% for a in page_assets %}
+          <div class="asset-card" data-asset-id="{{ a.id }}">
+            <div class="asset-card-header">
+              <span class="asset-type-tag {{ a.page_type }}">{{ a.page_type }}</span>
+              <span class="asset-label">{{ a.page_label }}</span>
+              <div class="asset-actions">
+                <button type="button" class="asset-action-btn" onclick="editAsset({{ a.id }})">Edit</button>
+                <button type="button" class="asset-action-btn danger" onclick="deleteAsset({{ a.id }})">Delete</button>
+              </div>
+            </div>
+            <div class="asset-url">{{ a.url }}</div>
+            {% if a.extracted_copy %}
+              <div class="asset-copy-preview">{{ a.extracted_copy[:240] }}{% if a.extracted_copy|length > 240 %}…{% endif %}</div>
+            {% else %}
+              <div class="asset-copy-empty">No copy captured yet.</div>
+            {% endif %}
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="assets-empty" id="assets-empty-msg">
+            No page assets yet. Add the homepage, the main PDP, and the checkout to start.
+          </div>
+        {% endif %}
+      </div>
+
+      <button type="button" class="btn-add-asset" id="btn-add-asset" style="margin-top:12px" onclick="addAsset()">
+        + Add page asset
+      </button>
     </div>
 
     <!-- 5. Test sizing -->
@@ -442,14 +617,15 @@
 </main>
 
 <script>
+  // ── Config injected from Jinja ────────────────────────────────────────
+  const CLIENT_SLUG     = '{{ client.client_slug }}';
+  const VALID_PAGE_TYPES = {{ valid_page_types|tojson }};
+
+  // ── Char counters ─────────────────────────────────────────────────────
   const vocVolEl     = document.getElementById('voc_volunteered');
   const vocVolCount  = document.getElementById('voc-volunteered-counter');
   const vocSolEl     = document.getElementById('voc_solicited');
   const vocSolCount  = document.getElementById('voc-solicited-counter');
-
-  const flash       = document.getElementById('flash');
-  const submitBtn   = document.getElementById('submit-btn');
-  const submitNote  = document.getElementById('submit-note');
 
   function bindCharCounter(el, counter) {
     el.addEventListener('input', () => {
@@ -459,10 +635,10 @@
       counter.classList.toggle('full', len > 12000);
     });
   }
-
   bindCharCounter(vocVolEl, vocVolCount);
   bindCharCounter(vocSolEl, vocSolCount);
 
+  // ── Schedule day selector ─────────────────────────────────────────────
   function updateScheduleDay() {
     const freq  = document.getElementById('report_frequency').value;
     const label = document.getElementById('schedule_day_label');
@@ -487,6 +663,198 @@
     }
   }
 
+  // ── Page asset management ─────────────────────────────────────────────
+  const flash       = document.getElementById('flash');
+  const submitBtn   = document.getElementById('submit-btn');
+  const submitNote  = document.getElementById('submit-note');
+  const formContainer = document.getElementById('asset-form-container');
+  const assetsList    = document.getElementById('assets-list');
+  const addBtn        = document.getElementById('btn-add-asset');
+
+  function showFlash(type, msg) {
+    flash.className = 'flash ' + type + ' show';
+    flash.textContent = msg;
+    flash.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    setTimeout(() => flash.classList.remove('show'), 8000);
+  }
+
+  function escapeHtml(s) {
+    if (s == null) return '';
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function renderAssetCard(a) {
+    const copyHtml = a.extracted_copy
+      ? `<div class="asset-copy-preview">${escapeHtml(a.extracted_copy.slice(0, 240))}${a.extracted_copy.length > 240 ? '…' : ''}</div>`
+      : `<div class="asset-copy-empty">No copy captured yet.</div>`;
+    return `
+      <div class="asset-card" data-asset-id="${a.id}">
+        <div class="asset-card-header">
+          <span class="asset-type-tag ${escapeHtml(a.page_type)}">${escapeHtml(a.page_type)}</span>
+          <span class="asset-label">${escapeHtml(a.page_label)}</span>
+          <div class="asset-actions">
+            <button type="button" class="asset-action-btn" onclick="editAsset(${a.id})">Edit</button>
+            <button type="button" class="asset-action-btn danger" onclick="deleteAsset(${a.id})">Delete</button>
+          </div>
+        </div>
+        <div class="asset-url">${escapeHtml(a.url)}</div>
+        ${copyHtml}
+      </div>
+    `;
+  }
+
+  async function refreshAssets() {
+    try {
+      const res = await fetch(`/v2/client/${CLIENT_SLUG}/page-assets`);
+      const data = await res.json();
+      const assets = data.page_assets || [];
+
+      document.getElementById('assets-count-note').textContent =
+        `${assets.length} configured`;
+
+      if (assets.length === 0) {
+        assetsList.innerHTML = `
+          <div class="assets-empty" id="assets-empty-msg">
+            No page assets yet. Add the homepage, the main PDP, and the checkout to start.
+          </div>`;
+      } else {
+        assetsList.innerHTML = assets.map(renderAssetCard).join('');
+      }
+    } catch (err) {
+      showFlash('error', 'Could not refresh page assets.');
+    }
+  }
+
+  function buildAssetForm(asset = null) {
+    const isEdit = asset !== null;
+    const typeOptions = VALID_PAGE_TYPES.map(t => {
+      const sel = isEdit && asset.page_type === t ? 'selected' : '';
+      return `<option value="${t}" ${sel}>${t}</option>`;
+    }).join('');
+
+    return `
+      <div class="asset-form" id="asset-form" data-asset-id="${isEdit ? asset.id : ''}">
+        <div class="asset-form-title">${isEdit ? 'Edit page asset' : 'New page asset'}</div>
+
+        <div class="grid-2" style="margin-bottom:12px">
+          <div class="field">
+            <label for="asset-page-type">Page type</label>
+            <select id="asset-page-type">${typeOptions}</select>
+          </div>
+          <div class="field">
+            <label for="asset-page-label">Label <span class="hint">e.g. "Trainers PDP"</span></label>
+            <input type="text" id="asset-page-label" placeholder="Short identifying label" value="${isEdit ? escapeHtml(asset.page_label) : ''}">
+          </div>
+        </div>
+
+        <div class="field" style="margin-bottom:12px">
+          <label for="asset-url">URL <span class="hint">absolute or path-only</span></label>
+          <input type="text" id="asset-url" placeholder="e.g. /products/wide-fit-trainers or https://example.com/checkout" value="${isEdit ? escapeHtml(asset.url) : ''}">
+        </div>
+
+        <div class="field">
+          <label for="asset-copy">Page copy <span class="hint">headline + first paragraph or key copy block</span></label>
+          <textarea id="asset-copy" rows="5" placeholder="Paste the headline and the first paragraph, or the key copy block from this page.">${isEdit ? escapeHtml(asset.extracted_copy || '') : ''}</textarea>
+        </div>
+
+        <div class="asset-form-actions">
+          <button type="button" class="btn-asset-save" onclick="saveAsset()">${isEdit ? 'Save changes' : 'Add asset'}</button>
+          <button type="button" class="btn-asset-cancel" onclick="cancelAssetForm()">Cancel</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function addAsset() {
+    formContainer.innerHTML = buildAssetForm(null);
+    addBtn.style.display = 'none';
+    document.getElementById('asset-page-label').focus();
+  }
+
+  async function editAsset(id) {
+    try {
+      const res = await fetch(`/v2/client/${CLIENT_SLUG}/page-assets`);
+      const data = await res.json();
+      const asset = (data.page_assets || []).find(a => a.id === id);
+      if (!asset) {
+        showFlash('error', 'Asset not found.');
+        return;
+      }
+      formContainer.innerHTML = buildAssetForm(asset);
+      addBtn.style.display = 'none';
+      formContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } catch (err) {
+      showFlash('error', 'Could not load asset for editing.');
+    }
+  }
+
+  function cancelAssetForm() {
+    formContainer.innerHTML = '';
+    addBtn.style.display = '';
+  }
+
+  async function saveAsset() {
+    const form = document.getElementById('asset-form');
+    const editId = form.dataset.assetId;
+    const isEdit = editId && editId !== '';
+
+    const payload = {
+      page_type:      document.getElementById('asset-page-type').value,
+      page_label:     document.getElementById('asset-page-label').value.trim(),
+      url:            document.getElementById('asset-url').value.trim(),
+      extracted_copy: document.getElementById('asset-copy').value.trim(),
+    };
+
+    if (!payload.page_label || !payload.url) {
+      showFlash('error', 'Label and URL are both required.');
+      return;
+    }
+
+    const url    = isEdit ? `/v2/page-assets/${editId}` : `/v2/client/${CLIENT_SLUG}/page-assets`;
+    const method = isEdit ? 'PATCH' : 'POST';
+
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showFlash('success', isEdit ? 'Page asset updated.' : 'Page asset added.');
+        cancelAssetForm();
+        await refreshAssets();
+      } else {
+        showFlash('error', data.error || 'Failed to save page asset.');
+      }
+    } catch (err) {
+      showFlash('error', 'Network error saving asset.');
+    }
+  }
+
+  async function deleteAsset(id) {
+    if (!confirm('Delete this page asset? This cannot be undone.')) return;
+
+    try {
+      const res = await fetch(`/v2/page-assets/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (res.ok) {
+        showFlash('success', 'Page asset deleted.');
+        await refreshAssets();
+      } else {
+        showFlash('error', data.error || 'Failed to delete page asset.');
+      }
+    } catch (err) {
+      showFlash('error', 'Network error deleting asset.');
+    }
+  }
+
+  // ── Main client form submit ───────────────────────────────────────────
   document.getElementById('edit-form').addEventListener('submit', async (e) => {
     e.preventDefault();
 
@@ -508,7 +876,7 @@
     };
 
     try {
-      const res = await fetch('/v2/client/{{ client.client_slug }}/reviews', {
+      const res = await fetch(`/v2/client/${CLIENT_SLUG}/reviews`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -528,13 +896,6 @@
     submitBtn.textContent = 'Save changes →';
     submitBtn.disabled = false;
   });
-
-  function showFlash(type, msg) {
-    flash.className = 'flash ' + type + ' show';
-    flash.textContent = msg;
-    flash.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    setTimeout(() => flash.classList.remove('show'), 8000);
-  }
 </script>
 </body>
 </html>

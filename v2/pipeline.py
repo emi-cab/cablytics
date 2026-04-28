@@ -10,12 +10,10 @@ Execution order:
 Each agent's output is stored to the database as it completes, so the
 dashboard can show partial results while the pipeline is still running.
 
-Phase 1 changes:
-  • Agent 3 now reads voc_volunteered + voc_solicited (split VoC) and the
-    list of client_page_assets, instead of customer_reviews + current_pdp_copy.
-  • Agent 4 now reads the list of client_page_assets instead of current_pdp_copy.
-  • The list will typically be empty until the Phase 2 page-assets UI ships;
-    prompts handle that case gracefully.
+Phase 2 changes:
+  • Agent 1 now receives the list of page assets so the prompt can inject
+    a URL→page-type mapping. URLs are still queried site-wide via GA4 if
+    no page assets exist.
 """
 
 import os
@@ -71,11 +69,9 @@ def _call_claude(system: str, user: str, agent_num: int) -> dict:
 
     raw = message.content[0].text
 
-    # Sanitise — same approach as V1
     raw = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', raw)
     raw = raw.strip()
 
-    # Strip markdown code fences if Claude added them despite instructions
     if raw.startswith("```"):
         raw = re.sub(r'^```[a-z]*\n?', '', raw)
         raw = re.sub(r'\n?```$', '', raw)
@@ -99,9 +95,6 @@ def run_agent1(client_data: dict, report_id: int) -> dict:
     context     = client_data.get("client_context", "")
     session_insights = client_data.get("session_insights", "")
 
-    # Phase 1: URLs now come from page assets, not the legacy target_urls field.
-    # Until page assets are populated (Phase 2), this list will be empty and
-    # GA4 will be queried in site-wide mode.
     page_assets = list_page_assets(client_id)
     urls = [a["url"] for a in page_assets if a.get("url")]
 
@@ -113,7 +106,7 @@ def run_agent1(client_data: dict, report_id: int) -> dict:
 
     log_event(client_id, "agent_started", report_id=report_id, agent_number=1, message="Calling Claude API")
 
-    system, user = agent1_prompt(funnel_summary, context, session_insights)
+    system, user = agent1_prompt(funnel_summary, context, session_insights, page_assets)
     output = _call_claude(system, user, agent_num=1)
 
     update_report_agent(report_id, 1, output)
@@ -208,23 +201,6 @@ def run_agent5(agent2_output: dict, client_data: dict, report_id: int) -> dict:
 # ── Main pipeline orchestrator ─────────────────────────────────────────────────
 
 def run_pipeline(client_slug: str, triggered_by: str = "manual"):
-    """
-    Entry point for a full V2 pipeline run.
-
-    Execution order:
-      1. Create report row (status = running)
-      2. Agents 1 + 3 in parallel threads
-      3. Agent 2 (after Agent 1 completes)
-      4. Agent 4 (after Agent 3 completes)
-      5. Agent 5 (after Agent 2 completes)
-      6. Mark report complete
-
-    Called by:
-      - routes.py POST /v2/report/run  (manual trigger)
-      - scheduler.py  (scheduled trigger)
-
-    Errors in any agent are caught, logged, and the report is marked failed.
-    """
     client_data = get_client_by_slug(client_slug)
     if not client_data:
         print(f"[V2][Pipeline] Client not found: {client_slug}", flush=True)
@@ -237,7 +213,6 @@ def run_pipeline(client_slug: str, triggered_by: str = "manual"):
     log_event(client_id, "pipeline_started", report_id=report_id,
               message=f"Triggered by: {triggered_by}")
 
-    # Update report status to running
     from v2.db import get_connection, DATABASE_URL
     with get_connection() as conn:
         if DATABASE_URL:
@@ -249,7 +224,6 @@ def run_pipeline(client_slug: str, triggered_by: str = "manual"):
     print(f"[V2][Pipeline] Starting | client={client_slug} | report_id={report_id}", flush=True)
 
     try:
-        # ── Agents 1 and 3 in parallel ─────────────────────────────────────
         agent1_result = {}
         agent3_result = {}
         agent1_error  = []
@@ -281,14 +255,10 @@ def run_pipeline(client_slug: str, triggered_by: str = "manual"):
         if agent3_error:
             raise RuntimeError(f"Agent 3 failed: {agent3_error[0]}")
 
-        # ── Agents 2 and 4 — sequential after their dependencies ───────────
         agent2_result = run_agent2(agent1_result, client_data, report_id)
         agent4_result = run_agent4(agent3_result, client_data, report_id)
-
-        # ── Agent 5 — after Agent 2 ─────────────────────────────────────────
         run_agent5(agent2_result, client_data, report_id)
 
-        # ── Mark complete ───────────────────────────────────────────────────
         complete_report(report_id)
         log_event(client_id, "pipeline_complete", report_id=report_id,
                   message="All 5 agents completed successfully")

@@ -8,20 +8,42 @@ wrappers — so the pipeline can parse and store outputs directly.
 JSON sanitisation (ensure_ascii, regex cleaning) is applied in pipeline.py
 after each API call, not here.
 
-Phase 1 changes:
-  • Agent 3 now consumes voc_volunteered + voc_solicited (split VoC).
-  • Agent 3 and Agent 4 now consume a list of tagged page_assets instead of
-    a single current_pdp_copy text blob. Until the Phase 2 UI ships, this
-    list will typically be empty — the prompts handle that gracefully.
+Phase 2 changes:
+  • Agent 1 now receives the list of page assets so it can map URLs back
+    to page types in its analysis (homepage, PLP, PDP, cart, checkout, etc.).
+  • _format_page_assets_for_agent1 is a thin formatter — only includes type +
+    label + URL (not copy), since Agent 1 cares about type/URL mapping, not
+    copy. Agent 3 and 4 still consume copy-rich page asset blocks.
 """
 
 
 # ── Agent 1: Funnel Analyst ────────────────────────────────────────────────────
 
-def agent1_prompt(funnel_summary: str, client_context: str, session_insights: str = '') -> tuple[str, str]:
+def _format_page_assets_for_agent1(page_assets: list[dict]) -> str:
+    """Brief mapping of URL → page type, for Agent 1's prompt."""
+    if not page_assets:
+        return "No page-type tagging provided — analyse all URLs site-wide."
+    lines = ["URL → page type mapping (use these tags in your findings):"]
+    for a in page_assets:
+        pt    = (a.get("page_type") or "other").upper()
+        label = a.get("page_label") or "Untitled"
+        url   = a.get("url") or ""
+        lines.append(f"  • {url}  →  {pt} ({label})")
+    return "\n".join(lines)
+
+
+def agent1_prompt(funnel_summary: str, client_context: str,
+                  session_insights: str = '',
+                  page_assets: list[dict] = None) -> tuple[str, str]:
+    page_map = _format_page_assets_for_agent1(page_assets or [])
+
     system = """You are a senior CRO analyst specialising in e-commerce funnel analysis.
 You receive GA4 data and identify exactly where revenue is leaking — pages or steps where
 drop-off is disproportionate to traffic volume.
+
+You also receive a URL-to-page-type mapping. When you reference a page in your output, use
+the page type tag in your finding (e.g. "the PDP at /products/x" not just "/products/x").
+This makes the report easier for the consultant and the next agent to interpret.
 
 You write in British English. Every claim must cite a specific number from the data.
 You never produce generic lists of "common CRO issues" — all findings must reference
@@ -35,6 +57,7 @@ Your JSON must follow this exact structure:
   "leak_map": [
     {
       "page": "/path",
+      "page_type": "homepage|plp|pdp|cart|checkout|category|other|unknown",
       "severity": "high|medium|low",
       "sessions": 12345,
       "bounce_rate": 0.72,
@@ -71,18 +94,21 @@ Your JSON must follow this exact structure:
     {
       "priority": 1,
       "page": "/path",
+      "page_type": "homepage|plp|pdp|cart|checkout|category|other|unknown",
       "hypothesis": "If/Then/Because statement",
       "data_evidence": "Specific numbers that support this hypothesis",
       "estimated_impact": "high|medium|low"
     }
   ],
-  "summary": "3-4 sentence plain English summary of the biggest findings. No bullet points. Cite numbers."
+  "summary": "3-4 sentence plain English summary of the biggest findings. Use page type tags. Cite numbers."
 }"""
 
     user = f"""Analyse the following GA4 funnel data and produce your JSON output.
 
 BUSINESS CONTEXT:
 {client_context or 'No specific business context provided.'}
+
+{page_map}
 
 GA4 DATA:
 {funnel_summary}
@@ -93,6 +119,9 @@ SESSION RECORDING INSIGHTS:
 Identify the 3 biggest revenue leaks. For each leak, give the mobile vs desktop breakdown
 where the data supports it. The mobile/desktop conversion ratio is the most important signal —
 a ratio below 0.70 (mobile CR / desktop CR) indicates a structural problem.
+
+When you reference a URL in any finding, also tag it with its page type from the mapping above.
+If a URL has no mapping, use "unknown" as the page_type.
 
 Focus on pages where drop-off is disproportionate to their traffic share.
 Produce your JSON output now."""
@@ -127,6 +156,7 @@ Your JSON must follow this exact structure:
     {
       "rank": 1,
       "page": "/path",
+      "page_type": "homepage|plp|pdp|cart|checkout|category|other|unknown",
       "hypothesis": "If/Then/Because statement",
       "test_type": "copy|layout|ux|social_proof|urgency|navigation|other",
       "impact_score": 4,
@@ -157,13 +187,14 @@ FUNNEL ANALYSIS OUTPUT (Agent 1):
 {json.dumps(agent1_output, indent=2, ensure_ascii=True)}
 
 Apply the Priority Score formula to every hypothesis in the leak_map and top_3_hypotheses.
+Carry through the page_type tag from each leak so the test calendar can group by page type.
 Add any additional test ideas you identify from the data that are not already in the hypothesis list.
 Output your ranked JSON now."""
 
     return system, user
 
 
-# ── Helper: format page assets for prompt injection ────────────────────────────
+# ── Helper: format page assets with copy for Agents 3 and 4 ────────────────────
 
 def _format_page_assets(page_assets: list[dict]) -> str:
     """
@@ -196,10 +227,6 @@ def _format_page_assets(page_assets: list[dict]) -> str:
 def agent3_prompt(voc_volunteered: str, voc_solicited: str,
                   competitor_notes: str, page_assets: list[dict],
                   client_context: str) -> tuple[str, str]:
-    """
-    Phase 1: Now consumes split VoC (volunteered + solicited) and a list of
-    tagged page assets instead of a single current_pdp_copy blob.
-    """
     system = """You are a consumer psychologist specialising in e-commerce purchase behaviour.
 You analyse Voice of Customer data to surface Category Entry Points (CEPs) — the specific
 moments, emotions, and contexts that trigger someone to seek a product.
@@ -312,11 +339,6 @@ Output your JSON now."""
 
 def agent4_prompt(agent3_output: dict, page_assets: list[dict],
                   client_context: str) -> tuple[str, str]:
-    """
-    Phase 1: Now consumes a list of tagged page assets instead of a single
-    current_pdp_copy blob. The agent picks which page to focus on based on
-    Agent 3's funnel_implication signal.
-    """
     import json
 
     system = """You are a direct-response copywriter specialising in e-commerce.
@@ -440,6 +462,7 @@ Your JSON must follow this exact structure:
         {
           "test_rank": 1,
           "page": "/path",
+          "page_type": "homepage|plp|pdp|cart|checkout|category|other|unknown",
           "hypothesis": "Brief version of the hypothesis",
           "estimated_runtime_days": 14,
           "sample_size_needed": 2000,
@@ -479,6 +502,7 @@ RANKED TEST ROADMAP (Agent 2):
 {json.dumps(agent2_output, indent=2, ensure_ascii=True)}
 
 Build the 4-week calendar. Maximise parallel tests within page-conflict constraints.
+Carry through the page_type tag for each test from Agent 2's output.
 Flag any test unlikely to reach significance within 28 days given the traffic volumes.
 Output your JSON now."""
 

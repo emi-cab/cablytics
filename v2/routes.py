@@ -2,26 +2,24 @@
 CABlytics V2 — Flask routes.
 
 Endpoints:
-  POST /v2/client/create                  Register a new client
-  POST /v2/client/<slug>/reviews          Update client config (VoC, context, etc.)
-  GET  /v2/client/<slug>                  Get client config (admin use)
-  GET  /v2/clients                        List all clients (admin use)
-  POST /v2/report/run                     Trigger a manual report run
-  GET  /v2/report/<slug>                  Get latest completed report JSON
-  GET  /v2/report/<slug>/status           Get current run status
-  GET  /v2/dashboard/<slug>               Serve the client dashboard HTML
-  GET  /v2/admin/onboard                  Serve the admin onboarding form
-  GET  /v2/admin/clients                  Serve the admin client list page
-  GET  /v2/admin/edit/<slug>              Serve the admin edit-client page
-  GET  /v2/health                         V2-specific health check
+  POST /v2/client/create                       Register a new client
+  POST /v2/client/<slug>/reviews               Update client config
+  GET  /v2/client/<slug>                       Get client config (admin use)
+  GET  /v2/clients                             List all clients (admin use)
+  POST /v2/report/run                          Trigger a manual report run
+  GET  /v2/report/<slug>                       Get latest completed report JSON
+  GET  /v2/report/<slug>/status                Get current run status
+  GET  /v2/dashboard/<slug>                    Serve the client dashboard HTML
+  GET  /v2/admin/onboard                       Serve the admin onboarding form
+  GET  /v2/admin/clients                       Serve the admin client list page
+  GET  /v2/admin/edit/<slug>                   Serve the admin edit-client page
+  GET  /v2/health                              V2-specific health check
 
-Phase 1 changes:
-  • client_create accepts voc_volunteered, voc_solicited, clarity_api_token,
-    gsc_site_url; rejects the removed fields (customer_reviews,
-    current_pdp_copy, target_urls).
-  • client_update_reviews has the same new field set.
-  • Sensitive fields stripped from API responses now: voc_volunteered,
-    voc_solicited, competitor_notes, clarity_api_token.
+  Phase 2 — page assets CRUD:
+  GET    /v2/client/<slug>/page-assets         List page assets for a client (JSON)
+  POST   /v2/client/<slug>/page-assets         Create a new page asset
+  PATCH  /v2/page-assets/<asset_id>            Update an existing page asset
+  DELETE /v2/page-assets/<asset_id>            Delete a page asset
 """
 
 import threading
@@ -38,6 +36,12 @@ from v2.db import (
     list_reports,
     get_run_log,
     list_page_assets,
+    create_page_asset,
+    update_page_asset,
+    get_page_asset,
+    delete_page_asset,
+    get_client_by_id,
+    VALID_PAGE_TYPES,
 )
 from v2.pipeline import run_pipeline
 from v2.scheduler import register_client_job
@@ -49,7 +53,6 @@ v2 = Blueprint("v2", __name__, url_prefix="/v2",
 init_db()
 
 
-# Fields that should never be returned in API responses (admin-only)
 SENSITIVE_FIELDS = {
     "voc_volunteered",
     "voc_solicited",
@@ -59,7 +62,6 @@ SENSITIVE_FIELDS = {
 
 
 def _strip_sensitive(client_dict: dict) -> dict:
-    """Return a copy of the client dict with sensitive fields removed."""
     return {k: v for k, v in client_dict.items() if k not in SENSITIVE_FIELDS}
 
 
@@ -83,19 +85,16 @@ def client_create():
     if missing:
         return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
 
-    # Check slug is not already taken
     if get_client_by_slug(data["client_slug"]):
         return jsonify({"error": f"A client with slug '{data['client_slug']}' already exists"}), 409
 
     client = create_client(data)
 
-    # Register scheduled job
     try:
         register_client_job(client)
     except Exception as e:
         print(f"[V2][routes] Scheduler registration failed for {client['client_slug']}: {e}", flush=True)
 
-    # Optionally trigger an immediate first run
     if data.get("run_now"):
         thread = threading.Thread(
             target=run_pipeline,
@@ -114,10 +113,6 @@ def client_create():
 
 @v2.route("/client/<slug>/reviews", methods=["POST"])
 def client_update_reviews(slug):
-    """
-    Update client config. Endpoint name kept for backward compatibility but
-    now accepts the full set of updatable client fields, not just VoC.
-    """
     if not get_client_by_slug(slug):
         return jsonify({"error": "Client not found"}), 404
 
@@ -145,7 +140,6 @@ def client_update_reviews(slug):
 
     updated = update_client(slug, updates)
 
-    # If schedule changed, re-register the cron job
     if "report_frequency" in updates or "schedule_day" in updates:
         try:
             register_client_job(updated)
@@ -169,6 +163,78 @@ def clients_list():
     return jsonify([_strip_sensitive(c) for c in clients])
 
 
+# ── Page assets (Phase 2) ──────────────────────────────────────────────────────
+
+@v2.route("/client/<slug>/page-assets", methods=["GET"])
+def page_assets_list(slug):
+    """List all page assets for a client."""
+    client = get_client_by_slug(slug)
+    if not client:
+        return jsonify({"error": "Client not found"}), 404
+    assets = list_page_assets(client["id"])
+    return jsonify({
+        "client_slug": slug,
+        "page_assets": assets,
+        "valid_page_types": sorted(VALID_PAGE_TYPES),
+    })
+
+
+@v2.route("/client/<slug>/page-assets", methods=["POST"])
+def page_assets_create(slug):
+    """Create a new page asset for a client."""
+    client = get_client_by_slug(slug)
+    if not client:
+        return jsonify({"error": "Client not found"}), 404
+
+    data = request.get_json(silent=True) or {}
+
+    required = ["page_type", "page_label", "url"]
+    missing = [f for f in required if not (data.get(f) or "").strip()]
+    if missing:
+        return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
+
+    if data["page_type"].lower() not in VALID_PAGE_TYPES:
+        return jsonify({
+            "error": f"Invalid page_type. Must be one of: {', '.join(sorted(VALID_PAGE_TYPES))}"
+        }), 400
+
+    asset = create_page_asset(client["id"], data)
+    return jsonify({"success": True, "asset": asset}), 201
+
+
+@v2.route("/page-assets/<int:asset_id>", methods=["PATCH"])
+def page_assets_update(asset_id):
+    """Update an existing page asset."""
+    existing = get_page_asset(asset_id)
+    if not existing:
+        return jsonify({"error": "Page asset not found"}), 404
+
+    data = request.get_json(silent=True) or {}
+
+    if "page_type" in data and data["page_type"].lower() not in VALID_PAGE_TYPES:
+        return jsonify({
+            "error": f"Invalid page_type. Must be one of: {', '.join(sorted(VALID_PAGE_TYPES))}"
+        }), 400
+
+    asset = update_page_asset(asset_id, data)
+    return jsonify({"success": True, "asset": asset})
+
+
+@v2.route("/page-assets/<int:asset_id>", methods=["DELETE"])
+def page_assets_delete(asset_id):
+    """
+    Delete a page asset. Note: in Phase 3, the screenshot file in Supabase
+    Storage is intentionally orphaned (not deleted) to keep the code simple.
+    Storage cleanup can be done manually in Supabase if needed.
+    """
+    existing = get_page_asset(asset_id)
+    if not existing:
+        return jsonify({"error": "Page asset not found"}), 404
+
+    deleted = delete_page_asset(asset_id)
+    return jsonify({"success": deleted, "deleted_id": asset_id})
+
+
 # ── Report runs ────────────────────────────────────────────────────────────────
 
 @v2.route("/report/run", methods=["POST"])
@@ -182,7 +248,6 @@ def report_run():
     if not client:
         return jsonify({"error": "Client not found"}), 404
 
-    # Prevent duplicate concurrent runs
     active = get_active_report(client["id"])
     if active:
         return jsonify({
@@ -191,7 +256,6 @@ def report_run():
             "status": active["status"],
         }), 409
 
-    # Run pipeline in background thread
     triggered_by = data.get("triggered_by", "manual")
     thread = threading.Thread(
         target=run_pipeline,
@@ -215,7 +279,6 @@ def report_get(slug):
 
     report = get_latest_report(slug)
     if not report:
-        # Check if one is currently running
         active = get_active_report(client["id"])
         if active:
             return jsonify({
@@ -333,4 +396,5 @@ def admin_edit(slug):
     page_assets = list_page_assets(client["id"])
     return render_template("admin_edit_client.html",
                            client=client,
-                           page_assets=page_assets)
+                           page_assets=page_assets,
+                           valid_page_types=sorted(VALID_PAGE_TYPES))
