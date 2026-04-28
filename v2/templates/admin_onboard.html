@@ -216,14 +216,6 @@
     }
     .slug-preview.active { color: var(--accent); }
 
-    /* ── URL counter ── */
-    .field-meta {
-      font-size: 0.73rem;
-      color: var(--ink-3);
-      font-family: var(--mono);
-      margin-top: 3px;
-    }
-
     /* ── Char counter ── */
     .char-counter {
       text-align: right;
@@ -234,6 +226,23 @@
     }
     .char-counter.warn { color: #f59e0b; }
     .char-counter.full { color: var(--accent-2); }
+
+    /* ── Phase 2 placeholder note ── */
+    .phase-note {
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      border-radius: var(--radius);
+      padding: 10px 14px;
+      font-size: 0.78rem;
+      color: #78350f;
+      line-height: 1.5;
+    }
+    .phase-note strong {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
 
     /* ── Divider ── */
     .divider {
@@ -318,7 +327,7 @@
 
 <main class="page">
   <h1 class="page-title">Register <span>new client</span></h1>
-  <p class="page-desc">Fill in all required fields to onboard a client to the V2 pipeline. The GA4 service account must already have Viewer access to the client's property before running the first report.</p>
+  <p class="page-desc">Fill in all required fields to onboard a client to the V2 pipeline. The GA4 service account must already have Viewer access to the client's property before running the first report. Page-specific URLs and copy will be added separately once the page-assets editor ships in Phase 2 — for now, GA4 will be queried in site-wide mode.</p>
 
   <div id="flash" class="flash"></div>
 
@@ -351,23 +360,10 @@
       </div>
     </div>
 
-    <!-- 2. GA4 scope -->
+    <!-- 2. Session insights -->
     <div class="section">
       <div class="section-header">
         <span class="section-num">02</span>
-        <span class="section-title">GA4 scope</span>
-      </div>
-      <div class="field">
-        <label for="target_urls">Target URLs <span class="hint">one per line</span></label>
-        <textarea id="target_urls" name="target_urls" rows="5" placeholder="/gym-locations/london&#10;/membership/join&#10;/classes&#10;/personal-training"></textarea>
-        <div class="field-meta" id="url-count">0 URLs</div>
-      </div>
-    </div>
-
-    <!-- 3. Session insights -->
-    <div class="section">
-      <div class="section-header">
-        <span class="section-num">03</span>
         <span class="section-title">Session recording insights</span>
         <span class="section-note">Clarity Copilot / Hotjar observations</span>
       </div>
@@ -377,32 +373,49 @@
       </div>
     </div>
 
-    <!-- 4. Consumer research inputs -->
+    <!-- 3. Voice of Customer -->
     <div class="section">
       <div class="section-header">
         <span class="section-num">03</span>
-        <span class="section-title">Consumer research inputs</span>
-        <span class="section-note">Agent 3 data — set once, update periodically</span>
+        <span class="section-title">Voice of Customer</span>
+        <span class="section-note">Agent 3 inputs — split by source type</span>
       </div>
+
       <div class="field" style="margin-bottom:16px">
-        <label for="customer_reviews">Customer reviews <span class="hint">100–300 reviews, plain text</span></label>
-        <textarea id="customer_reviews" name="customer_reviews" rows="8" placeholder="Paste Trustpilot / Google / Amazon reviews here. One review per paragraph is fine — no formatting needed."></textarea>
-        <div class="char-counter" id="reviews-counter">0 chars</div>
+        <label for="voc_volunteered">Volunteered VoC <span class="hint">reviews, support tickets, complaints, social mentions</span></label>
+        <textarea id="voc_volunteered" name="voc_volunteered" rows="8" placeholder="Paste Trustpilot / Google / Amazon reviews, support ticket excerpts, or social mentions here. One item per paragraph is fine — no formatting needed."></textarea>
+        <div class="char-counter" id="voc-volunteered-counter">0 chars</div>
       </div>
+
       <div class="field" style="margin-bottom:16px">
-        <label for="competitor_notes">Competitor notes <span class="hint">optional</span></label>
-        <textarea id="competitor_notes" name="competitor_notes" rows="4" placeholder="Paste competitor review snippets or switching reasons observed on forums / Reddit."></textarea>
+        <label for="voc_solicited">Solicited VoC <span class="hint">surveys, NPS, on-site polls, interview transcripts</span></label>
+        <textarea id="voc_solicited" name="voc_solicited" rows="8" placeholder="Paste survey responses, NPS verbatims, on-site poll answers, or interview snippets here. One response per paragraph is fine."></textarea>
+        <div class="char-counter" id="voc-solicited-counter">0 chars</div>
       </div>
+
       <div class="field">
-        <label for="current_pdp_copy">Current PDP / homepage copy <span class="hint">headline + first paragraph</span></label>
-        <textarea id="current_pdp_copy" name="current_pdp_copy" rows="4" placeholder="Paste the current homepage headline and first paragraph, or the key PDP headline and opening copy."></textarea>
+        <label for="competitor_notes">Competitor notes <span class="hint">optional</span></label>
+        <textarea id="competitor_notes" name="competitor_notes" rows="4" placeholder="Paste competitor review snippets, switching reasons observed on forums or Reddit, or notes on differentiation."></textarea>
+      </div>
+    </div>
+
+    <!-- 4. Page assets placeholder (Phase 2) -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-num">04</span>
+        <span class="section-title">Page assets</span>
+        <span class="section-note">coming in Phase 2</span>
+      </div>
+      <div class="phase-note">
+        <strong>Phase 2 — not yet available.</strong><br>
+        Tagged page URLs and copy (homepage, PLP, PDP, cart, checkout, etc.) will be managed here once the page-assets editor ships. Until then, Agent 1 queries GA4 in site-wide mode and Agent 4 generates copy using only the business context above.
       </div>
     </div>
 
     <!-- 5. Test sizing -->
     <div class="section">
       <div class="section-header">
-        <span class="section-num">04</span>
+        <span class="section-num">05</span>
         <span class="section-title">Test sizing</span>
         <span class="section-note">Used by Agent 5 for calendar sizing</span>
       </div>
@@ -421,7 +434,7 @@
     <!-- 6. Schedule -->
     <div class="section">
       <div class="section-header">
-        <span class="section-num">05</span>
+        <span class="section-num">06</span>
         <span class="section-title">Report schedule</span>
       </div>
       <div class="grid-3">
@@ -451,7 +464,7 @@
       </div>
     </div>
 
-    <!-- 7. Submit -->
+    <!-- Submit -->
     <div class="section">
       <div class="divider"></div>
       <div class="submit-area">
@@ -468,10 +481,12 @@
   const nameEl   = document.getElementById('client_name');
   const slugEl   = document.getElementById('client_slug');
   const preview  = document.getElementById('slug-preview');
-  const urlsEl   = document.getElementById('target_urls');
-  const urlCount = document.getElementById('url-count');
-  const reviewsEl     = document.getElementById('customer_reviews');
-  const reviewCounter = document.getElementById('reviews-counter');
+
+  const vocVolEl     = document.getElementById('voc_volunteered');
+  const vocVolCount  = document.getElementById('voc-volunteered-counter');
+  const vocSolEl     = document.getElementById('voc_solicited');
+  const vocSolCount  = document.getElementById('voc-solicited-counter');
+
   const submitBtn  = document.getElementById('submit-btn');
   const submitNote = document.getElementById('submit-note');
   const flash      = document.getElementById('flash');
@@ -510,17 +525,17 @@
     }
   }
 
-  urlsEl.addEventListener('input', () => {
-    const lines = urlsEl.value.split('\n').filter(l => l.trim().length > 0);
-    urlCount.textContent = lines.length + (lines.length === 1 ? ' URL' : ' URLs');
-  });
+  function bindCharCounter(el, counter) {
+    el.addEventListener('input', () => {
+      const len = el.value.length;
+      counter.textContent = len.toLocaleString() + ' chars';
+      counter.classList.toggle('warn', len > 8000 && len <= 12000);
+      counter.classList.toggle('full', len > 12000);
+    });
+  }
 
-  reviewsEl.addEventListener('input', () => {
-    const len = reviewsEl.value.length;
-    reviewCounter.textContent = len.toLocaleString() + ' chars';
-    reviewCounter.classList.toggle('warn', len > 8000 && len <= 12000);
-    reviewCounter.classList.toggle('full', len > 12000);
-  });
+  bindCharCounter(vocVolEl, vocVolCount);
+  bindCharCounter(vocSolEl, vocSolCount);
 
   function updateScheduleDay() {
     const freq  = document.getElementById('report_frequency').value;
@@ -564,12 +579,11 @@
       client_name:        document.getElementById('client_name').value.trim(),
       client_slug:        document.getElementById('client_slug').value.trim(),
       ga4_property_id:    document.getElementById('ga4_property_id').value.trim(),
-      session_insights:   document.getElementById('session_insights').value.trim(),
       client_context:     document.getElementById('client_context').value.trim(),
-      target_urls:        document.getElementById('target_urls').value.trim(),
-      customer_reviews:   document.getElementById('customer_reviews').value.trim(),
+      session_insights:   document.getElementById('session_insights').value.trim(),
+      voc_volunteered:    document.getElementById('voc_volunteered').value.trim(),
+      voc_solicited:      document.getElementById('voc_solicited').value.trim(),
       competitor_notes:   document.getElementById('competitor_notes').value.trim(),
-      current_pdp_copy:   document.getElementById('current_pdp_copy').value.trim(),
       monthly_traffic:    parseInt(document.getElementById('monthly_traffic').value) || null,
       dev_hours_per_week: parseInt(document.getElementById('dev_hours_per_week').value) || null,
       report_frequency:   document.getElementById('report_frequency').value,
@@ -591,8 +605,8 @@
         slugManuallyEdited = false;
         preview.textContent = 'cablytics.onrender.com/v2/dashboard/…';
         preview.classList.remove('active');
-        urlCount.textContent = '0 URLs';
-        reviewCounter.textContent = '0 chars';
+        vocVolCount.textContent = '0 chars';
+        vocSolCount.textContent = '0 chars';
         submitNote.textContent = 'Client saved successfully';
       } else {
         showFlash('error', data.error || 'Something went wrong. Check the Render logs.');

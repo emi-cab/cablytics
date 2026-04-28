@@ -4,8 +4,16 @@ CABlytics V2 — database layer.
 Uses PostgreSQL (Supabase) when DATABASE_URL is set, falls back to SQLite
 for local development.
 
-All public functions have identical signatures to the original SQLite version
-so no other files need changing.
+Schema (Phase 1):
+  • clients
+      - VoC split into voc_volunteered + voc_solicited
+      - competitor_notes retained
+      - clarity_api_token, gsc_site_url placeholders for Phase 4/5
+      - session_insights retained for manual Clarity Copilot paste
+      - target_urls and current_pdp_copy REMOVED (replaced by client_page_assets)
+  • client_page_assets (new)
+      - per-client tagged pages with optional copy + screenshot
+  • reports, run_log unchanged
 """
 
 import os
@@ -76,13 +84,6 @@ else:
     PLACEHOLDER = "?"
 
 
-def _p(n=1):
-    """Return n placeholders as a tuple-friendly string."""
-    if PLACEHOLDER == "%s":
-        return ", ".join(["%s"] * n)
-    return ", ".join(["?"] * n)
-
-
 # ── Schema ─────────────────────────────────────────────────────────────────────
 
 def init_db():
@@ -98,27 +99,41 @@ def _init_postgres():
         with conn.cursor() as cur:
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS clients (
-                    id                  SERIAL PRIMARY KEY,
-                    client_name         TEXT NOT NULL,
-                    client_slug         TEXT NOT NULL UNIQUE,
-                    ga4_property_id     TEXT NOT NULL,
-                    client_context      TEXT,
-                    target_urls         TEXT,
-                    session_insights    TEXT,
-                    customer_reviews    TEXT,
-                    competitor_notes    TEXT,
-                    current_pdp_copy    TEXT,
-                    monthly_traffic     INTEGER,
-                    dev_hours_per_week  INTEGER,
-                    report_frequency    TEXT DEFAULT 'monthly',
-                    schedule_day        TEXT,
-                    created_at          TEXT NOT NULL,
-                    updated_at          TEXT NOT NULL
+                    id                   SERIAL PRIMARY KEY,
+                    client_name          TEXT NOT NULL,
+                    client_slug          TEXT NOT NULL UNIQUE,
+                    ga4_property_id      TEXT NOT NULL,
+                    client_context       TEXT,
+                    voc_volunteered      TEXT,
+                    voc_solicited        TEXT,
+                    competitor_notes     TEXT,
+                    session_insights     TEXT,
+                    clarity_api_token    TEXT,
+                    gsc_site_url         TEXT,
+                    monthly_traffic      INTEGER,
+                    dev_hours_per_week   INTEGER,
+                    report_frequency     TEXT DEFAULT 'monthly',
+                    schedule_day         TEXT,
+                    created_at           TEXT NOT NULL,
+                    updated_at           TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS client_page_assets (
+                    id                SERIAL PRIMARY KEY,
+                    client_id         INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+                    page_type         TEXT NOT NULL,
+                    page_label        TEXT NOT NULL,
+                    url               TEXT NOT NULL,
+                    extracted_copy    TEXT,
+                    screenshot_path   TEXT,
+                    display_order     INTEGER DEFAULT 0,
+                    created_at        TEXT NOT NULL,
+                    updated_at        TEXT NOT NULL
                 );
 
                 CREATE TABLE IF NOT EXISTS reports (
                     id                  SERIAL PRIMARY KEY,
-                    client_id           INTEGER NOT NULL REFERENCES clients(id),
+                    client_id           INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
                     run_triggered_by    TEXT NOT NULL DEFAULT 'manual',
                     status              TEXT NOT NULL DEFAULT 'pending',
                     agent1_output       TEXT,
@@ -133,13 +148,13 @@ def _init_postgres():
                 );
 
                 CREATE TABLE IF NOT EXISTS run_log (
-                    id                  SERIAL PRIMARY KEY,
-                    client_id           INTEGER NOT NULL,
-                    report_id           INTEGER,
-                    event               TEXT NOT NULL,
-                    agent_number        INTEGER,
-                    message             TEXT,
-                    timestamp           TEXT NOT NULL
+                    id              SERIAL PRIMARY KEY,
+                    client_id       INTEGER NOT NULL,
+                    report_id       INTEGER,
+                    event           TEXT NOT NULL,
+                    agent_number    INTEGER,
+                    message         TEXT,
+                    timestamp       TEXT NOT NULL
                 );
             """)
 
@@ -148,27 +163,41 @@ def _init_sqlite():
     with get_connection() as conn:
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS clients (
-                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-                client_name         TEXT NOT NULL,
-                client_slug         TEXT NOT NULL UNIQUE,
-                ga4_property_id     TEXT NOT NULL,
-                client_context      TEXT,
-                target_urls         TEXT,
-                session_insights    TEXT,
-                customer_reviews    TEXT,
-                competitor_notes    TEXT,
-                current_pdp_copy    TEXT,
-                monthly_traffic     INTEGER,
-                dev_hours_per_week  INTEGER,
-                report_frequency    TEXT DEFAULT 'monthly',
-                schedule_day        TEXT,
-                created_at          TEXT NOT NULL,
-                updated_at          TEXT NOT NULL
+                id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+                client_name          TEXT NOT NULL,
+                client_slug          TEXT NOT NULL UNIQUE,
+                ga4_property_id      TEXT NOT NULL,
+                client_context       TEXT,
+                voc_volunteered      TEXT,
+                voc_solicited        TEXT,
+                competitor_notes     TEXT,
+                session_insights     TEXT,
+                clarity_api_token    TEXT,
+                gsc_site_url         TEXT,
+                monthly_traffic      INTEGER,
+                dev_hours_per_week   INTEGER,
+                report_frequency     TEXT DEFAULT 'monthly',
+                schedule_day         TEXT,
+                created_at           TEXT NOT NULL,
+                updated_at           TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS client_page_assets (
+                id                INTEGER PRIMARY KEY AUTOINCREMENT,
+                client_id         INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+                page_type         TEXT NOT NULL,
+                page_label        TEXT NOT NULL,
+                url               TEXT NOT NULL,
+                extracted_copy    TEXT,
+                screenshot_path   TEXT,
+                display_order     INTEGER DEFAULT 0,
+                created_at        TEXT NOT NULL,
+                updated_at        TEXT NOT NULL
             );
 
             CREATE TABLE IF NOT EXISTS reports (
                 id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-                client_id           INTEGER NOT NULL REFERENCES clients(id),
+                client_id           INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
                 run_triggered_by    TEXT NOT NULL DEFAULT 'manual',
                 status              TEXT NOT NULL DEFAULT 'pending',
                 agent1_output       TEXT,
@@ -183,13 +212,13 @@ def _init_sqlite():
             );
 
             CREATE TABLE IF NOT EXISTS run_log (
-                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-                client_id           INTEGER NOT NULL,
-                report_id           INTEGER,
-                event               TEXT NOT NULL,
-                agent_number        INTEGER,
-                message             TEXT,
-                timestamp           TEXT NOT NULL
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                client_id       INTEGER NOT NULL,
+                report_id       INTEGER,
+                event           TEXT NOT NULL,
+                agent_number    INTEGER,
+                message         TEXT,
+                timestamp       TEXT NOT NULL
             );
         """)
 
@@ -200,74 +229,77 @@ def now_utc():
 
 # ── Clients ────────────────────────────────────────────────────────────────────
 
+# Whitelist of fields that can be set on create or update.
+# Keeping this in one place prevents SQL drift between create/update.
+CLIENT_FIELDS = (
+    "client_name",
+    "client_slug",
+    "ga4_property_id",
+    "client_context",
+    "voc_volunteered",
+    "voc_solicited",
+    "competitor_notes",
+    "session_insights",
+    "clarity_api_token",
+    "gsc_site_url",
+    "monthly_traffic",
+    "dev_hours_per_week",
+    "report_frequency",
+    "schedule_day",
+)
+
+
 def create_client(data: dict) -> dict:
     ts = now_utc()
+    cols = list(CLIENT_FIELDS) + ["created_at", "updated_at"]
+    values = [data.get(f) if f != "report_frequency"
+              else data.get(f, "monthly")
+              for f in CLIENT_FIELDS] + [ts, ts]
+
+    placeholders = ", ".join([PLACEHOLDER] * len(cols))
+    col_list = ", ".join(cols)
+
     with get_connection() as conn:
         if DATABASE_URL:
             with conn.cursor() as cur:
-                cur.execute("""
-                    INSERT INTO clients (
-                        client_name, client_slug, ga4_property_id,
-                        client_context, target_urls, customer_reviews,
-                        competitor_notes, current_pdp_copy,
-                        monthly_traffic, dev_hours_per_week,
-                        report_frequency, schedule_day,
-                        created_at, updated_at
-                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                    RETURNING *
-                """, (
-                    data["client_name"], data["client_slug"], data["ga4_property_id"],
-                    data.get("client_context"), data.get("target_urls"),
-                    data.get("customer_reviews"), data.get("competitor_notes"),
-                    data.get("current_pdp_copy"), data.get("monthly_traffic"),
-                    data.get("dev_hours_per_week"), data.get("report_frequency", "monthly"),
-                    data.get("schedule_day"), ts, ts,
-                ))
+                cur.execute(
+                    f"INSERT INTO clients ({col_list}) VALUES ({placeholders}) RETURNING *",
+                    values,
+                )
                 row = cur.fetchone()
                 return dict(row) if row else None
         else:
-            cur = conn.execute("""
-                INSERT INTO clients (
-                    client_name, client_slug, ga4_property_id,
-                    client_context, target_urls, customer_reviews,
-                    competitor_notes, current_pdp_copy,
-                    monthly_traffic, dev_hours_per_week,
-                    report_frequency, schedule_day,
-                    created_at, updated_at
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-            """, (
-                data["client_name"], data["client_slug"], data["ga4_property_id"],
-                data.get("client_context"), data.get("target_urls"),
-                data.get("customer_reviews"), data.get("competitor_notes"),
-                data.get("current_pdp_copy"), data.get("monthly_traffic"),
-                data.get("dev_hours_per_week"), data.get("report_frequency", "monthly"),
-                data.get("schedule_day"), ts, ts,
-            ))
+            cur = conn.execute(
+                f"INSERT INTO clients ({col_list}) VALUES ({placeholders})",
+                values,
+            )
             row = conn.execute("SELECT * FROM clients WHERE id = ?", (cur.lastrowid,)).fetchone()
             return dict(row) if row else None
 
 
 def update_client(client_slug: str, data: dict) -> dict | None:
-    allowed = {
-        "client_name", "ga4_property_id", "client_context", "target_urls",
-        "customer_reviews", "competitor_notes", "current_pdp_copy",
-        "monthly_traffic", "dev_hours_per_week", "report_frequency", "schedule_day", "session_insights"
-    }
+    # Allow updating any client field except slug (which is the lookup key)
+    allowed = set(CLIENT_FIELDS) - {"client_slug"}
     updates = {k: v for k, v in data.items() if k in allowed}
     if not updates:
         return get_client_by_slug(client_slug)
 
     updates["updated_at"] = now_utc()
-    ph = PLACEHOLDER
-    set_clause = ", ".join(f"{k} = {ph}" for k in updates)
+    set_clause = ", ".join(f"{k} = {PLACEHOLDER}" for k in updates)
     values = list(updates.values()) + [client_slug]
 
     with get_connection() as conn:
         if DATABASE_URL:
             with conn.cursor() as cur:
-                cur.execute(f"UPDATE clients SET {set_clause} WHERE client_slug = {ph}", values)
+                cur.execute(
+                    f"UPDATE clients SET {set_clause} WHERE client_slug = {PLACEHOLDER}",
+                    values,
+                )
         else:
-            conn.execute(f"UPDATE clients SET {set_clause} WHERE client_slug = ?", values)
+            conn.execute(
+                f"UPDATE clients SET {set_clause} WHERE client_slug = ?",
+                values,
+            )
 
     return get_client_by_slug(client_slug)
 
@@ -307,6 +339,131 @@ def delete_client(client_slug: str) -> bool:
                 return cur.rowcount > 0
         else:
             result = conn.execute("DELETE FROM clients WHERE client_slug = ?", (client_slug,))
+            return result.rowcount > 0
+
+
+# ── Client page assets ─────────────────────────────────────────────────────────
+
+PAGE_ASSET_FIELDS = (
+    "page_type",
+    "page_label",
+    "url",
+    "extracted_copy",
+    "screenshot_path",
+    "display_order",
+)
+
+VALID_PAGE_TYPES = {
+    "homepage", "plp", "pdp", "cart", "checkout", "category", "other"
+}
+
+
+def create_page_asset(client_id: int, data: dict) -> dict:
+    ts = now_utc()
+    page_type = (data.get("page_type") or "other").lower()
+    if page_type not in VALID_PAGE_TYPES:
+        page_type = "other"
+
+    values = (
+        client_id,
+        page_type,
+        data.get("page_label") or "Untitled",
+        data.get("url") or "",
+        data.get("extracted_copy"),
+        data.get("screenshot_path"),
+        data.get("display_order", 0),
+        ts,
+        ts,
+    )
+
+    with get_connection() as conn:
+        if DATABASE_URL:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO client_page_assets
+                        (client_id, page_type, page_label, url, extracted_copy,
+                         screenshot_path, display_order, created_at, updated_at)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    RETURNING *
+                """, values)
+                row = cur.fetchone()
+                return dict(row) if row else None
+        else:
+            cur = conn.execute("""
+                INSERT INTO client_page_assets
+                    (client_id, page_type, page_label, url, extracted_copy,
+                     screenshot_path, display_order, created_at, updated_at)
+                VALUES (?,?,?,?,?,?,?,?,?)
+            """, values)
+            row = conn.execute(
+                "SELECT * FROM client_page_assets WHERE id = ?", (cur.lastrowid,)
+            ).fetchone()
+            return dict(row) if row else None
+
+
+def update_page_asset(asset_id: int, data: dict) -> dict | None:
+    updates = {k: v for k, v in data.items() if k in PAGE_ASSET_FIELDS}
+    if "page_type" in updates:
+        pt = (updates["page_type"] or "other").lower()
+        updates["page_type"] = pt if pt in VALID_PAGE_TYPES else "other"
+
+    if not updates:
+        return get_page_asset(asset_id)
+
+    updates["updated_at"] = now_utc()
+    set_clause = ", ".join(f"{k} = {PLACEHOLDER}" for k in updates)
+    values = list(updates.values()) + [asset_id]
+
+    with get_connection() as conn:
+        if DATABASE_URL:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"UPDATE client_page_assets SET {set_clause} WHERE id = {PLACEHOLDER}",
+                    values,
+                )
+        else:
+            conn.execute(
+                f"UPDATE client_page_assets SET {set_clause} WHERE id = ?",
+                values,
+            )
+
+    return get_page_asset(asset_id)
+
+
+def get_page_asset(asset_id: int) -> dict | None:
+    with get_connection() as conn:
+        if DATABASE_URL:
+            with conn.cursor() as cur:
+                return _row(cur, f"SELECT * FROM client_page_assets WHERE id = {PLACEHOLDER}", (asset_id,))
+        else:
+            return _row(conn, "SELECT * FROM client_page_assets WHERE id = ?", (asset_id,))
+
+
+def list_page_assets(client_id: int) -> list[dict]:
+    with get_connection() as conn:
+        if DATABASE_URL:
+            with conn.cursor() as cur:
+                return _rows(cur, """
+                    SELECT * FROM client_page_assets
+                    WHERE client_id = %s
+                    ORDER BY display_order ASC, id ASC
+                """, (client_id,))
+        else:
+            return _rows(conn, """
+                SELECT * FROM client_page_assets
+                WHERE client_id = ?
+                ORDER BY display_order ASC, id ASC
+            """, (client_id,))
+
+
+def delete_page_asset(asset_id: int) -> bool:
+    with get_connection() as conn:
+        if DATABASE_URL:
+            with conn.cursor() as cur:
+                cur.execute(f"DELETE FROM client_page_assets WHERE id = {PLACEHOLDER}", (asset_id,))
+                return cur.rowcount > 0
+        else:
+            result = conn.execute("DELETE FROM client_page_assets WHERE id = ?", (asset_id,))
             return result.rowcount > 0
 
 

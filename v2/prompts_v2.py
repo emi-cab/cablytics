@@ -7,6 +7,12 @@ wrappers — so the pipeline can parse and store outputs directly.
 
 JSON sanitisation (ensure_ascii, regex cleaning) is applied in pipeline.py
 after each API call, not here.
+
+Phase 1 changes:
+  • Agent 3 now consumes voc_volunteered + voc_solicited (split VoC).
+  • Agent 3 and Agent 4 now consume a list of tagged page_assets instead of
+    a single current_pdp_copy text blob. Until the Phase 2 UI ships, this
+    list will typically be empty — the prompts handle that gracefully.
 """
 
 
@@ -157,13 +163,59 @@ Output your ranked JSON now."""
     return system, user
 
 
+# ── Helper: format page assets for prompt injection ────────────────────────────
+
+def _format_page_assets(page_assets: list[dict]) -> str:
+    """
+    Format a list of client_page_assets rows as a labelled block for prompt
+    injection. Returns a string. Returns a placeholder string if the list is
+    empty so prompts read cleanly either way.
+    """
+    if not page_assets:
+        return "No page assets provided."
+
+    blocks = []
+    for asset in page_assets:
+        page_type = (asset.get("page_type") or "other").upper()
+        label = asset.get("page_label") or "Untitled"
+        url = asset.get("url") or ""
+        copy = (asset.get("extracted_copy") or "").strip()
+
+        block = [f"--- {page_type} — {label} ({url}) ---"]
+        if copy:
+            block.append(copy)
+        else:
+            block.append("[No copy captured for this page yet.]")
+        blocks.append("\n".join(block))
+
+    return "\n\n".join(blocks)
+
+
 # ── Agent 3: Consumer Researcher ──────────────────────────────────────────────
 
-def agent3_prompt(customer_reviews: str, competitor_notes: str,
-                  current_pdp_copy: str, client_context: str) -> tuple[str, str]:
+def agent3_prompt(voc_volunteered: str, voc_solicited: str,
+                  competitor_notes: str, page_assets: list[dict],
+                  client_context: str) -> tuple[str, str]:
+    """
+    Phase 1: Now consumes split VoC (volunteered + solicited) and a list of
+    tagged page assets instead of a single current_pdp_copy blob.
+    """
     system = """You are a consumer psychologist specialising in e-commerce purchase behaviour.
-You analyse customer reviews to surface Category Entry Points (CEPs) — the specific moments,
-emotions, and contexts that trigger someone to seek a product.
+You analyse Voice of Customer data to surface Category Entry Points (CEPs) — the specific
+moments, emotions, and contexts that trigger someone to seek a product.
+
+You receive two types of VoC and must weight them differently:
+
+  VOLUNTEERED VoC (reviews, support tickets, complaints, social mentions)
+    These are unprompted — customers chose to speak. Strong signal for emotional triggers,
+    objections, and post-purchase satisfaction. Selection-biased toward strong opinions.
+
+  SOLICITED VoC (surveys, NPS, on-site polls, interviews)
+    These are prompted — customers were asked. Better for structured comparison and
+    mid-funnel intent. Selection-biased toward whoever was willing to fill in a survey.
+
+When the two sources disagree, note the disagreement explicitly — it usually reveals
+something about who buys vs who responds.
 
 CEPs answer six questions:
 1. With/for whom do they buy?
@@ -173,7 +225,8 @@ CEPs answer six questions:
 5. With what do they co-purchase?
 6. How are they feeling when they buy?
 
-You write in British English. Every CEP must be supported by verbatim customer quotes.
+You write in British English. Every CEP must be supported by verbatim customer quotes,
+and each quote must be tagged with its source ("volunteered" or "solicited").
 You never produce demographic personas ("health-conscious millennials") — only specific
 triggering moments.
 
@@ -190,11 +243,11 @@ Your JSON must follow this exact structure:
       "triggering_moment": "The specific situation that sent them searching",
       "emotional_state": "How they were feeling when they bought",
       "quotes": [
-        "Verbatim customer quote 1",
-        "Verbatim customer quote 2",
-        "Verbatim customer quote 3"
+        {"text": "Verbatim customer quote 1", "source": "volunteered"},
+        {"text": "Verbatim customer quote 2", "source": "solicited"},
+        {"text": "Verbatim customer quote 3", "source": "volunteered"}
       ],
-      "funnel_implication": "Where on the funnel this CEP should be addressed (homepage/PDP/checkout)"
+      "funnel_implication": "Where on the funnel this CEP should be addressed (homepage/PLP/PDP/checkout)"
     }
   ],
   "objections": [
@@ -202,7 +255,9 @@ Your JSON must follow this exact structure:
       "rank": 1,
       "objection": "The fear or doubt that almost stopped the purchase",
       "frequency": "high|medium|low",
-      "quotes": ["Verbatim quote showing this objection"],
+      "quotes": [
+        {"text": "Verbatim quote showing this objection", "source": "volunteered"}
+      ],
       "suggested_response": "How the copy or UX could address this objection"
     }
   ],
@@ -210,30 +265,44 @@ Your JSON must follow this exact structure:
     {
       "phrase": "Exact phrase customers use",
       "meaning": "What they mean by it",
-      "use_in_copy": "Where this phrase should appear"
+      "use_in_copy": "Which page type this phrase should appear on (homepage/PLP/PDP/checkout)"
     }
   ],
-  "copy_gap_analysis": "One paragraph comparing the current PDP copy against the top CEPs. Where is the gap between what customers say drives purchase and what the copy currently says?",
+  "voc_source_disagreements": [
+    {
+      "topic": "What the two VoC sources disagree about",
+      "volunteered_says": "What unprompted reviews/social show",
+      "solicited_says": "What surveys show",
+      "implication": "What this disagreement reveals"
+    }
+  ],
+  "copy_gap_analysis": "One paragraph comparing the current page copy (across all provided pages) against the top CEPs. Where is the gap between what customers say drives purchase and what the copy currently says? Reference specific pages by their type (e.g. 'the PDP says X, but customers describe it as Y').",
   "summary": "2-3 sentence plain English summary of the most important CEP insights."
 }"""
 
-    user = f"""Analyse the following customer reviews and surface the top Category Entry Points.
+    pages_block = _format_page_assets(page_assets)
+
+    user = f"""Analyse the following Voice of Customer data and surface the top Category Entry Points.
 
 BUSINESS CONTEXT:
 {client_context or 'No specific business context provided.'}
 
-CURRENT PDP / HOMEPAGE COPY:
-{current_pdp_copy or 'No current copy provided.'}
+CURRENT PAGE COPY (tagged by page type):
+{pages_block}
 
-CUSTOMER REVIEWS:
-{customer_reviews or 'No reviews provided.'}
+VOLUNTEERED VoC (reviews, support tickets, complaints, social):
+{voc_volunteered or 'No volunteered VoC provided.'}
+
+SOLICITED VoC (surveys, NPS, polls, interviews):
+{voc_solicited or 'No solicited VoC provided.'}
 
 COMPETITOR NOTES:
 {competitor_notes or 'No competitor notes provided.'}
 
-Identify the top 3 CEPs. For each, provide 3 verbatim quotes as evidence.
-Also identify the top 3 objections that almost stopped the purchase.
+Identify the top 3 CEPs. For each, provide 3 verbatim quotes as evidence, tagged by source.
+Identify the top 3 objections that almost stopped the purchase.
 Extract the exact language customers use to describe the benefit (not the feature).
+Where the two VoC sources disagree, surface the disagreement explicitly.
 Output your JSON now."""
 
     return system, user
@@ -241,11 +310,16 @@ Output your JSON now."""
 
 # ── Agent 4: Copy Optimiser ────────────────────────────────────────────────────
 
-def agent4_prompt(agent3_output: dict, current_pdp_copy: str,
+def agent4_prompt(agent3_output: dict, page_assets: list[dict],
                   client_context: str) -> tuple[str, str]:
+    """
+    Phase 1: Now consumes a list of tagged page assets instead of a single
+    current_pdp_copy blob. The agent picks which page to focus on based on
+    Agent 3's funnel_implication signal.
+    """
     import json
 
-    system = """You are a direct-response copywriter specialising in e-commerce PDPs.
+    system = """You are a direct-response copywriter specialising in e-commerce.
 You write copy that works the outside-in: customer's entry point → emotional trigger →
 product as solution → features as validation.
 
@@ -257,6 +331,10 @@ The three headline formulas that consistently outperform:
 2. Say what you get — "Wake Up Energised. Stay Focused All Day." (outcome-first)
 3. Say what you're able to do — "Finally Deadlift Without Lower Back Pain" (removes a blocker)
 
+You receive multiple tagged page versions (homepage, PLP, PDP, cart, checkout, etc.).
+Pick the page where Agent 3's research points to the strongest leak, but you may
+suggest copy fixes for additional pages where the gap is obvious.
+
 You write in British English.
 
 CRITICAL: Respond with a single valid JSON object and nothing else.
@@ -264,6 +342,12 @@ No preamble, no markdown, no code fences. Raw JSON only.
 
 Your JSON must follow this exact structure:
 {
+  "primary_page_focus": {
+    "page_type": "homepage|plp|pdp|cart|checkout|category|other",
+    "page_label": "The label of the page you focused on",
+    "url": "The page URL",
+    "rationale": "One sentence on why this page was chosen as the primary focus"
+  },
   "headline_variants": [
     {
       "formula": "say_what_it_is|say_what_you_get|say_what_you_can_do",
@@ -273,13 +357,23 @@ Your JSON must follow this exact structure:
       "a_b_test_hypothesis": "If we replace the current headline with this, then [outcome], because [reason]"
     }
   ],
-  "pdp_opening_rewrite": {
-    "original": "The current opening paragraph (as provided)",
+  "page_opening_rewrite": {
+    "page_type": "Which page this rewrite is for",
+    "original": "The current opening paragraph from that page (as provided)",
     "rewritten": "The new opening paragraph — leads with primary CEP, not product features",
     "changes_made": "One sentence explaining what was changed and why"
   },
+  "additional_page_suggestions": [
+    {
+      "page_type": "Which other page",
+      "page_label": "Its label",
+      "specific_change": "One concrete copy change to make",
+      "rationale": "Why this change addresses a CEP or objection"
+    }
+  ],
   "cta_suggestions": [
     {
+      "page_type": "Which page this CTA is for",
       "current": "Current CTA text if known",
       "suggested": "New CTA text",
       "rationale": "Why this CTA better matches the CEP"
@@ -290,19 +384,26 @@ Your JSON must follow this exact structure:
   "summary": "2-3 sentence plain English summary of the copy strategy."
 }"""
 
-    user = f"""Rewrite the headline and PDP opening copy based on the consumer research below.
+    pages_block = _format_page_assets(page_assets)
+
+    user = f"""Rewrite the headline and primary page opening copy based on the consumer research below.
 
 BUSINESS CONTEXT:
 {client_context or 'No specific business context provided.'}
 
-CURRENT PDP / HOMEPAGE COPY:
-{current_pdp_copy or 'No current copy provided.'}
+CURRENT PAGE COPY (tagged by page type):
+{pages_block}
 
 CONSUMER RESEARCH OUTPUT (Agent 3):
 {json.dumps(agent3_output, indent=2, ensure_ascii=True)}
 
-Write 3 headline variants — one per formula. Then rewrite the first paragraph of the PDP
+Pick the strongest-leak page based on Agent 3's funnel_implication and copy_gap_analysis.
+Write 3 headline variants for that page — one per formula. Then rewrite the first paragraph
 to lead with the primary CEP, not the product features.
+
+If other pages have obvious copy gaps that Agent 3 surfaced, add them under
+additional_page_suggestions — but keep that list short (max 3 items) and concrete.
+
 No vague superlatives. No fake urgency. Use the exact customer language from the research.
 Output your JSON now."""
 

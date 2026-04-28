@@ -179,6 +179,22 @@
     .char-counter.warn { color: #f59e0b; }
     .char-counter.full { color: var(--accent-2); }
 
+    .phase-note {
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      border-radius: var(--radius);
+      padding: 10px 14px;
+      font-size: 0.78rem;
+      color: #78350f;
+      line-height: 1.5;
+    }
+    .phase-note strong {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
     .divider {
       height: 1px;
       background: var(--border);
@@ -268,7 +284,7 @@
 
 <main class="page">
   <h1 class="page-title">Edit <span>{{ client.client_name }}</span></h1>
-  <p class="page-desc">Update client settings, target URLs, consumer research inputs, or scheduling. Changes take effect on the next report run.</p>
+  <p class="page-desc">Update client settings, Voice of Customer inputs, or scheduling. Changes take effect on the next report run. Page assets (tagged URLs and copy) are coming in Phase 2.</p>
 
   <div id="flash" class="flash"></div>
 
@@ -299,24 +315,10 @@
       </div>
     </div>
 
-    <!-- 2. GA4 scope -->
+    <!-- 2. Session insights -->
     <div class="section">
       <div class="section-header">
         <span class="section-num">02</span>
-        <span class="section-title">GA4 scope</span>
-        <span class="section-note">3–5 URLs recommended</span>
-      </div>
-      <div class="field">
-        <label for="target_urls">Target URLs <span class="hint">one per line</span></label>
-        <textarea id="target_urls" name="target_urls" rows="5">{{ client.target_urls or '' }}</textarea>
-        <div class="field-meta" id="url-count">{{ client.target_urls.split('\n') | selectattr('strip') | list | length if client.target_urls else 0 }} URLs</div>
-      </div>
-    </div>
-    
-    <!-- Session insights -->
-    <div class="section">
-      <div class="section-header">
-        <span class="section-num">03</span>
         <span class="section-title">Session recording insights</span>
         <span class="section-note">Clarity Copilot / Hotjar observations</span>
       </div>
@@ -326,32 +328,55 @@
       </div>
     </div>
 
-    <!-- 3. Consumer research -->
+    <!-- 3. Voice of Customer -->
     <div class="section">
       <div class="section-header">
         <span class="section-num">03</span>
-        <span class="section-title">Consumer research inputs</span>
-        <span class="section-note">Agent 3 data</span>
+        <span class="section-title">Voice of Customer</span>
+        <span class="section-note">Agent 3 inputs — split by source type</span>
       </div>
+
       <div class="field" style="margin-bottom:16px">
-        <label for="customer_reviews">Customer reviews <span class="hint">100–300 reviews, plain text</span></label>
-        <textarea id="customer_reviews" name="customer_reviews" rows="8">{{ client.customer_reviews or '' }}</textarea>
-        <div class="char-counter" id="reviews-counter">{{ (client.customer_reviews or '') | length }} chars</div>
+        <label for="voc_volunteered">Volunteered VoC <span class="hint">reviews, support tickets, complaints, social mentions</span></label>
+        <textarea id="voc_volunteered" name="voc_volunteered" rows="8" placeholder="Paste Trustpilot / Google / Amazon reviews, support ticket excerpts, or social mentions. One item per paragraph.">{{ client.voc_volunteered or '' }}</textarea>
+        <div class="char-counter" id="voc-volunteered-counter">{{ (client.voc_volunteered or '') | length }} chars</div>
       </div>
+
       <div class="field" style="margin-bottom:16px">
-        <label for="competitor_notes">Competitor notes <span class="hint">optional</span></label>
-        <textarea id="competitor_notes" name="competitor_notes" rows="4">{{ client.competitor_notes or '' }}</textarea>
+        <label for="voc_solicited">Solicited VoC <span class="hint">surveys, NPS, on-site polls, interviews</span></label>
+        <textarea id="voc_solicited" name="voc_solicited" rows="8" placeholder="Paste survey responses, NPS verbatims, on-site poll answers, or interview snippets. One response per paragraph.">{{ client.voc_solicited or '' }}</textarea>
+        <div class="char-counter" id="voc-solicited-counter">{{ (client.voc_solicited or '') | length }} chars</div>
       </div>
+
       <div class="field">
-        <label for="current_pdp_copy">Current PDP / homepage copy <span class="hint">headline + first paragraph</span></label>
-        <textarea id="current_pdp_copy" name="current_pdp_copy" rows="4">{{ client.current_pdp_copy or '' }}</textarea>
+        <label for="competitor_notes">Competitor notes <span class="hint">optional</span></label>
+        <textarea id="competitor_notes" name="competitor_notes" rows="4" placeholder="Paste competitor review snippets, switching reasons observed on forums or Reddit, or notes on differentiation.">{{ client.competitor_notes or '' }}</textarea>
       </div>
     </div>
 
-    <!-- 4. Test sizing -->
+    <!-- 4. Page assets -->
     <div class="section">
       <div class="section-header">
         <span class="section-num">04</span>
+        <span class="section-title">Page assets</span>
+        <span class="section-note">{{ page_assets|length }} configured · Phase 2 editor coming</span>
+      </div>
+      {% if page_assets %}
+        <div class="phase-note">
+          {{ page_assets|length }} page asset(s) configured for this client. The full editor (add / edit / remove pages, upload screenshots) ships in Phase 2.
+        </div>
+      {% else %}
+        <div class="phase-note">
+          <strong>Phase 2 — not yet available.</strong><br>
+          Tagged page URLs and copy (homepage, PLP, PDP, cart, checkout, etc.) will be managed here once the page-assets editor ships. Until then, Agent 1 queries GA4 in site-wide mode and Agent 4 generates copy using only the business context.
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- 5. Test sizing -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-num">05</span>
         <span class="section-title">Test sizing</span>
       </div>
       <div class="grid-2">
@@ -366,10 +391,10 @@
       </div>
     </div>
 
-    <!-- 5. Schedule -->
+    <!-- 6. Schedule -->
     <div class="section">
       <div class="section-header">
-        <span class="section-num">05</span>
+        <span class="section-num">06</span>
         <span class="section-title">Report schedule</span>
       </div>
       <div class="grid-3">
@@ -417,25 +442,26 @@
 </main>
 
 <script>
-  const urlsEl      = document.getElementById('target_urls');
-  const urlCount    = document.getElementById('url-count');
-  const reviewsEl   = document.getElementById('customer_reviews');
-  const reviewCount = document.getElementById('reviews-counter');
+  const vocVolEl     = document.getElementById('voc_volunteered');
+  const vocVolCount  = document.getElementById('voc-volunteered-counter');
+  const vocSolEl     = document.getElementById('voc_solicited');
+  const vocSolCount  = document.getElementById('voc-solicited-counter');
+
   const flash       = document.getElementById('flash');
   const submitBtn   = document.getElementById('submit-btn');
   const submitNote  = document.getElementById('submit-note');
 
-  urlsEl.addEventListener('input', () => {
-    const lines = urlsEl.value.split('\n').filter(l => l.trim().length > 0);
-    urlCount.textContent = lines.length + (lines.length === 1 ? ' URL' : ' URLs');
-  });
+  function bindCharCounter(el, counter) {
+    el.addEventListener('input', () => {
+      const len = el.value.length;
+      counter.textContent = len.toLocaleString() + ' chars';
+      counter.classList.toggle('warn', len > 8000 && len <= 12000);
+      counter.classList.toggle('full', len > 12000);
+    });
+  }
 
-  reviewsEl.addEventListener('input', () => {
-    const len = reviewsEl.value.length;
-    reviewCount.textContent = len.toLocaleString() + ' chars';
-    reviewCount.classList.toggle('warn', len > 8000 && len <= 12000);
-    reviewCount.classList.toggle('full', len > 12000);
-  });
+  bindCharCounter(vocVolEl, vocVolCount);
+  bindCharCounter(vocSolEl, vocSolCount);
 
   function updateScheduleDay() {
     const freq  = document.getElementById('report_frequency').value;
@@ -471,11 +497,10 @@
       client_name:        document.getElementById('client_name').value.trim(),
       ga4_property_id:    document.getElementById('ga4_property_id').value.trim(),
       client_context:     document.getElementById('client_context').value.trim(),
-      target_urls:        document.getElementById('target_urls').value.trim(),
-      session_insights: document.getElementById('session_insights').value.trim(),
-      customer_reviews:   document.getElementById('customer_reviews').value.trim(),
+      session_insights:   document.getElementById('session_insights').value.trim(),
+      voc_volunteered:    document.getElementById('voc_volunteered').value.trim(),
+      voc_solicited:      document.getElementById('voc_solicited').value.trim(),
       competitor_notes:   document.getElementById('competitor_notes').value.trim(),
-      current_pdp_copy:   document.getElementById('current_pdp_copy').value.trim(),
       monthly_traffic:    parseInt(document.getElementById('monthly_traffic').value) || null,
       dev_hours_per_week: parseInt(document.getElementById('dev_hours_per_week').value) || null,
       report_frequency:   document.getElementById('report_frequency').value,

@@ -3,7 +3,7 @@ CABlytics V2 — Flask routes.
 
 Endpoints:
   POST /v2/client/create                  Register a new client
-  POST /v2/client/<slug>/reviews          Update stored reviews for a client
+  POST /v2/client/<slug>/reviews          Update client config (VoC, context, etc.)
   GET  /v2/client/<slug>                  Get client config (admin use)
   GET  /v2/clients                        List all clients (admin use)
   POST /v2/report/run                     Trigger a manual report run
@@ -12,7 +12,16 @@ Endpoints:
   GET  /v2/dashboard/<slug>               Serve the client dashboard HTML
   GET  /v2/admin/onboard                  Serve the admin onboarding form
   GET  /v2/admin/clients                  Serve the admin client list page
+  GET  /v2/admin/edit/<slug>              Serve the admin edit-client page
   GET  /v2/health                         V2-specific health check
+
+Phase 1 changes:
+  • client_create accepts voc_volunteered, voc_solicited, clarity_api_token,
+    gsc_site_url; rejects the removed fields (customer_reviews,
+    current_pdp_copy, target_urls).
+  • client_update_reviews has the same new field set.
+  • Sensitive fields stripped from API responses now: voc_volunteered,
+    voc_solicited, competitor_notes, clarity_api_token.
 """
 
 import threading
@@ -28,6 +37,7 @@ from v2.db import (
     get_active_report,
     list_reports,
     get_run_log,
+    list_page_assets,
 )
 from v2.pipeline import run_pipeline
 from v2.scheduler import register_client_job
@@ -37,6 +47,20 @@ v2 = Blueprint("v2", __name__, url_prefix="/v2",
 
 # Initialise DB tables on blueprint load
 init_db()
+
+
+# Fields that should never be returned in API responses (admin-only)
+SENSITIVE_FIELDS = {
+    "voc_volunteered",
+    "voc_solicited",
+    "competitor_notes",
+    "clarity_api_token",
+}
+
+
+def _strip_sensitive(client_dict: dict) -> dict:
+    """Return a copy of the client dict with sensitive fields removed."""
+    return {k: v for k, v in client_dict.items() if k not in SENSITIVE_FIELDS}
 
 
 # ── Health ─────────────────────────────────────────────────────────────────────
@@ -82,7 +106,7 @@ def client_create():
 
     return jsonify({
         "success": True,
-        "client": client,
+        "client": _strip_sensitive(client),
         "dashboard_url": f"/v2/dashboard/{client['client_slug']}",
         "run_triggered": bool(data.get("run_now")),
     }), 201
@@ -90,20 +114,45 @@ def client_create():
 
 @v2.route("/client/<slug>/reviews", methods=["POST"])
 def client_update_reviews(slug):
+    """
+    Update client config. Endpoint name kept for backward compatibility but
+    now accepts the full set of updatable client fields, not just VoC.
+    """
     if not get_client_by_slug(slug):
         return jsonify({"error": "Client not found"}), 404
 
     data = request.get_json(silent=True) or {}
-    updatable = ["customer_reviews", "competitor_notes", "current_pdp_copy",
-                 "client_context", "target_urls", "monthly_traffic",
-                 "dev_hours_per_week", "ga4_property_id"]
+
+    updatable = [
+        "client_name",
+        "ga4_property_id",
+        "client_context",
+        "voc_volunteered",
+        "voc_solicited",
+        "competitor_notes",
+        "session_insights",
+        "clarity_api_token",
+        "gsc_site_url",
+        "monthly_traffic",
+        "dev_hours_per_week",
+        "report_frequency",
+        "schedule_day",
+    ]
     updates = {k: data[k] for k in updatable if k in data}
 
     if not updates:
         return jsonify({"error": "No updatable fields provided"}), 400
 
     updated = update_client(slug, updates)
-    return jsonify({"success": True, "client": updated})
+
+    # If schedule changed, re-register the cron job
+    if "report_frequency" in updates or "schedule_day" in updates:
+        try:
+            register_client_job(updated)
+        except Exception as e:
+            print(f"[V2][routes] Scheduler re-registration failed for {slug}: {e}", flush=True)
+
+    return jsonify({"success": True, "client": _strip_sensitive(updated)})
 
 
 @v2.route("/client/<slug>")
@@ -111,20 +160,13 @@ def client_get(slug):
     client = get_client_by_slug(slug)
     if not client:
         return jsonify({"error": "Client not found"}), 404
-    # Strip sensitive review data from API response
-    safe = {k: v for k, v in client.items()
-            if k not in ("customer_reviews", "competitor_notes")}
-    return jsonify(safe)
+    return jsonify(_strip_sensitive(client))
 
 
 @v2.route("/clients")
 def clients_list():
     clients = list_clients()
-    safe = [
-        {k: v for k, v in c.items() if k not in ("customer_reviews", "competitor_notes")}
-        for c in clients
-    ]
-    return jsonify(safe)
+    return jsonify([_strip_sensitive(c) for c in clients])
 
 
 # ── Report runs ────────────────────────────────────────────────────────────────
@@ -282,9 +324,13 @@ def admin_clients():
                            clients=clients,
                            reports_by_slug=reports_by_slug)
 
+
 @v2.route("/admin/edit/<slug>")
 def admin_edit(slug):
     client = get_client_by_slug(slug)
     if not client:
         abort(404)
-    return render_template("admin_edit_client.html", client=client)
+    page_assets = list_page_assets(client["id"])
+    return render_template("admin_edit_client.html",
+                           client=client,
+                           page_assets=page_assets)

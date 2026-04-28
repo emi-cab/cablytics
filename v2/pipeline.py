@@ -9,6 +9,13 @@ Execution order:
 
 Each agent's output is stored to the database as it completes, so the
 dashboard can show partial results while the pipeline is still running.
+
+Phase 1 changes:
+  • Agent 3 now reads voc_volunteered + voc_solicited (split VoC) and the
+    list of client_page_assets, instead of customer_reviews + current_pdp_copy.
+  • Agent 4 now reads the list of client_page_assets instead of current_pdp_copy.
+  • The list will typically be empty until the Phase 2 page-assets UI ships;
+    prompts handle that case gracefully.
 """
 
 import os
@@ -24,6 +31,7 @@ from v2.db import (
     fail_report,
     log_event,
     get_client_by_slug,
+    list_page_assets,
 )
 from v2.ga4_queries_v2 import collect_funnel_data, build_funnel_summary
 from v2.prompts_v2 import (
@@ -88,13 +96,17 @@ def run_agent1(client_data: dict, report_id: int) -> dict:
     """Funnel Analyst — pulls GA4 data and identifies revenue leaks."""
     client_id   = client_data["id"]
     property_id = client_data["ga4_property_id"]
-    urls_raw    = client_data.get("target_urls", "")
     context     = client_data.get("client_context", "")
     session_insights = client_data.get("session_insights", "")
 
-    urls = [u.strip() for u in urls_raw.split("\n") if u.strip()] if urls_raw else []
+    # Phase 1: URLs now come from page assets, not the legacy target_urls field.
+    # Until page assets are populated (Phase 2), this list will be empty and
+    # GA4 will be queried in site-wide mode.
+    page_assets = list_page_assets(client_id)
+    urls = [a["url"] for a in page_assets if a.get("url")]
 
-    log_event(client_id, "agent_started", report_id=report_id, agent_number=1, message="Collecting GA4 data")
+    log_event(client_id, "agent_started", report_id=report_id, agent_number=1,
+              message=f"Collecting GA4 data ({len(urls)} URLs)")
 
     ga4_result     = collect_funnel_data(property_id, urls)
     funnel_summary = build_funnel_summary(ga4_result)
@@ -131,16 +143,20 @@ def run_agent2(agent1_output: dict, client_data: dict, report_id: int) -> dict:
 
 
 def run_agent3(client_data: dict, report_id: int) -> dict:
-    """Consumer Researcher — mines reviews and surfaces CEPs."""
-    client_id = client_data["id"]
-    reviews   = client_data.get("customer_reviews", "")
-    competitor = client_data.get("competitor_notes", "")
-    pdp_copy  = client_data.get("current_pdp_copy", "")
-    context   = client_data.get("client_context", "")
+    """Consumer Researcher — mines VoC and surfaces CEPs."""
+    client_id        = client_data["id"]
+    voc_volunteered  = client_data.get("voc_volunteered", "")
+    voc_solicited    = client_data.get("voc_solicited", "")
+    competitor_notes = client_data.get("competitor_notes", "")
+    context          = client_data.get("client_context", "")
 
-    log_event(client_id, "agent_started", report_id=report_id, agent_number=3, message="Analysing reviews")
+    page_assets = list_page_assets(client_id)
 
-    system, user = agent3_prompt(reviews, competitor, pdp_copy, context)
+    log_event(client_id, "agent_started", report_id=report_id, agent_number=3,
+              message=f"Analysing VoC ({len(page_assets)} page assets)")
+
+    system, user = agent3_prompt(voc_volunteered, voc_solicited,
+                                 competitor_notes, page_assets, context)
     output = _call_claude(system, user, agent_num=3)
 
     update_report_agent(report_id, 3, output)
@@ -151,14 +167,16 @@ def run_agent3(client_data: dict, report_id: int) -> dict:
 
 
 def run_agent4(agent3_output: dict, client_data: dict, report_id: int) -> dict:
-    """Copy Optimiser — rewrites headlines and PDP copy based on CEPs."""
+    """Copy Optimiser — rewrites headlines and page copy based on CEPs."""
     client_id = client_data["id"]
-    pdp_copy  = client_data.get("current_pdp_copy", "")
     context   = client_data.get("client_context", "")
 
-    log_event(client_id, "agent_started", report_id=report_id, agent_number=4, message="Generating copy variants")
+    page_assets = list_page_assets(client_id)
 
-    system, user = agent4_prompt(agent3_output, pdp_copy, context)
+    log_event(client_id, "agent_started", report_id=report_id, agent_number=4,
+              message=f"Generating copy variants ({len(page_assets)} pages)")
+
+    system, user = agent4_prompt(agent3_output, page_assets, context)
     output = _call_claude(system, user, agent_num=4)
 
     update_report_agent(report_id, 4, output)
@@ -219,7 +237,7 @@ def run_pipeline(client_slug: str, triggered_by: str = "manual"):
     log_event(client_id, "pipeline_started", report_id=report_id,
               message=f"Triggered by: {triggered_by}")
 
-# Update report status to running
+    # Update report status to running
     from v2.db import get_connection, DATABASE_URL
     with get_connection() as conn:
         if DATABASE_URL:
