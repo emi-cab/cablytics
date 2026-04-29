@@ -103,6 +103,42 @@
     }
     .page-title span { font-weight: 400; font-style: italic; color: var(--accent); }
 
+    /* ── Welcome banner (shown when ?just_created=1) ── */
+    .welcome-banner {
+      display: none;
+      background: var(--brand-yellow);
+      color: var(--brand-yellow-dark);
+      border-radius: var(--radius);
+      padding: 18px 22px;
+      margin-bottom: 28px;
+      font-family: var(--serif);
+      font-style: italic;
+      font-size: 1rem;
+      line-height: 1.5;
+      animation: welcomeIn 360ms cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
+    .welcome-banner.show { display: block; }
+    .welcome-banner strong { font-weight: 500; font-style: normal; }
+    .welcome-banner-close {
+      float: right;
+      background: none;
+      border: none;
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--brand-yellow-dark);
+      cursor: pointer;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      opacity: 0.7;
+      padding: 2px 6px;
+      transition: opacity var(--transition);
+    }
+    .welcome-banner-close:hover { opacity: 1; }
+    @keyframes welcomeIn {
+      from { opacity: 0; transform: translateY(-8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
     .page-desc {
       font-size: 0.875rem;
       color: var(--ink-2);
@@ -641,6 +677,11 @@
   <h1 class="page-title">Edit <span>{{ client.client_name }}</span></h1>
   <p class="page-desc">Update client settings, Voice of Customer inputs, page assets, or scheduling. Changes take effect on the next report run.</p>
 
+  <div id="welcome-banner" class="welcome-banner">
+    <button type="button" class="welcome-banner-close" onclick="dismissWelcome()">Dismiss</button>
+    <strong>Client created.</strong> Configure any of the optional sections below — page assets, screenshots, Voice of Customer, Search Console, ad creatives — then trigger your first report run from the dashboard. Everything below is optional but each one improves report quality.
+  </div>
+
   <div id="flash" class="flash"></div>
 
   <form id="edit-form" novalidate>
@@ -922,6 +963,29 @@
 </main>
 
 <script>
+  // ── Welcome banner (shown when redirected from onboarding) ────────────
+  function dismissWelcome() {
+    const b = document.getElementById('welcome-banner');
+    if (!b) return;
+    b.style.transition = 'opacity 200ms ease, transform 200ms ease';
+    b.style.opacity = '0';
+    b.style.transform = 'translateY(-8px)';
+    setTimeout(() => b.classList.remove('show'), 220);
+    // Also strip ?just_created from the URL so a refresh doesn't bring it back
+    if (window.history && window.history.replaceState) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('just_created');
+      window.history.replaceState({}, '', url.toString());
+    }
+  }
+  (function showWelcomeIfNeeded() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('just_created') === '1') {
+      const b = document.getElementById('welcome-banner');
+      if (b) b.classList.add('show');
+    }
+  })();
+
   // ── Config injected from Jinja ────────────────────────────────────────
   const CLIENT_SLUG     = '{{ client.client_slug }}';
   const VALID_PAGE_TYPES = {{ valid_page_types|tojson }};

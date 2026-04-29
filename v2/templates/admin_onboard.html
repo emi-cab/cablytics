@@ -32,7 +32,7 @@
       --mono:   'Geist Mono', monospace;
       --radius:      8px;
       --radius-pill: 20px;
-      --transition: 180ms ease;
+      --transition:  180ms ease;
     }
 
     html { font-size: 15px; }
@@ -94,9 +94,9 @@
 
     /* ── Layout ── */
     .page {
-      max-width: 860px;
+      max-width: 640px;
       margin: 0 auto;
-      padding: 52px 32px 0;
+      padding: 64px 32px 0;
     }
 
     .page-title {
@@ -113,168 +113,97 @@
     .page-desc {
       font-size: 0.875rem;
       color: var(--ink-2);
-      margin-bottom: 44px;
+      margin-bottom: 36px;
       line-height: 1.6;
     }
+    .page-desc strong { color: var(--ink); font-weight: 500; }
 
-    /* ── Section ── */
-    .section {
-      margin-bottom: 44px;
-      opacity: 0;
-      transform: translateY(12px);
-      animation: reveal 400ms ease forwards;
-    }
-    .section:nth-child(1) { animation-delay: 60ms; }
-    .section:nth-child(2) { animation-delay: 120ms; }
-    .section:nth-child(3) { animation-delay: 180ms; }
-    .section:nth-child(4) { animation-delay: 240ms; }
-    .section:nth-child(5) { animation-delay: 300ms; }
-    .section:nth-child(6) { animation-delay: 360ms; }
-
-    @keyframes reveal {
-      to { opacity: 1; transform: none; }
+    /* ── Form ── */
+    .form-card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px;
+      margin-bottom: 24px;
     }
 
-    .section-header {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 20px;
-      padding-bottom: 12px;
-      border-bottom: 1px solid var(--border);
-    }
-    .section-num {
-      font-family: var(--mono);
-      font-size: 0.7rem;
-      color: var(--accent);
-      background: rgba(102,226,227,0.2);
-      border: 1px solid rgba(102,226,227,0.5);
-      padding: 2px 9px;
-      border-radius: var(--radius-pill);
-      flex-shrink: 0;
-    }
-    .section-title {
-      font-family: var(--serif);
-      font-size: 1.15rem;
-      font-weight: 400;
-      color: var(--ink-headline);
-      letter-spacing: -0.01em;
-    }
-    .section-note {
-      margin-left: auto;
-      font-size: 0.75rem;
-      color: var(--ink-3);
-      font-family: var(--mono);
-    }
-
-    /* ── Grid ── */
-    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
-    .span-2 { grid-column: span 2; }
-
-    /* ── Field ── */
-    .field { display: flex; flex-direction: column; gap: 5px; }
+    .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 18px; }
+    .field:last-child { margin-bottom: 0; }
 
     label {
       font-size: 0.78rem;
       font-weight: 500;
-      color: var(--ink-2);
+      color: var(--ink);
       letter-spacing: 0.01em;
       display: flex;
       align-items: center;
       gap: 6px;
     }
-    label .req {
-      color: var(--accent-2);
-      font-size: 0.7rem;
-    }
     label .hint {
       font-weight: 400;
-      color: var(--ink-3);
+      color: var(--ink-2);
       font-size: 0.73rem;
       margin-left: auto;
     }
 
-    input[type="text"],
-    input[type="number"],
-    select,
-    textarea {
+    input[type="text"] {
       font-family: var(--sans);
       font-size: 0.875rem;
       color: var(--ink);
       background: #fff;
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 9px 12px;
+      padding: 10px 12px;
       outline: none;
       transition: border-color var(--transition), box-shadow var(--transition);
       width: 100%;
-      appearance: none;
-      -webkit-appearance: none;
     }
-    input[type="text"]:focus,
-    input[type="number"]:focus,
-    select:focus,
-    textarea:focus {
+    input:focus {
       border-color: var(--accent);
       box-shadow: 0 0 0 3px rgba(6,96,96,0.12);
     }
-    input::placeholder,
-    textarea::placeholder { color: var(--ink-3); }
+    input::placeholder { color: var(--ink-3); }
 
-    textarea { resize: vertical; line-height: 1.55; }
-
-    select {
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%237a7a85' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
-      background-repeat: no-repeat;
-      background-position: right 12px center;
-      padding-right: 34px;
-      cursor: pointer;
-    }
-
-    /* ── Slug preview ── */
     .slug-preview {
       font-family: var(--mono);
-      font-size: 0.75rem;
-      color: var(--ink-3);
-      margin-top: 3px;
-      min-height: 18px;
-      transition: color var(--transition);
-    }
-    .slug-preview.active { color: var(--accent); }
-
-    /* ── URL counter ── */
-    .field-meta {
-      font-size: 0.73rem;
-      color: var(--ink-3);
-      font-family: var(--mono);
+      font-size: 0.74rem;
+      color: var(--ink-2);
       margin-top: 3px;
     }
+    .slug-preview strong { color: var(--accent); font-weight: 500; }
 
-    /* ── Char counter ── */
-    .char-counter {
-      text-align: right;
-      font-size: 0.7rem;
-      font-family: var(--mono);
-      color: var(--ink-3);
-      transition: color var(--transition);
+    .checkbox-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 14px;
+      background: var(--surface);
+      border-radius: var(--radius);
+      margin-top: 8px;
     }
-    .char-counter.warn { color: #f59e0b; }
-    .char-counter.full { color: var(--accent-2); }
-
-    /* ── Divider ── */
-    .divider {
-      height: 1px;
-      background: var(--border);
-      margin: 8px 0 16px;
+    .checkbox-row input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      margin-top: 1px;
+      cursor: pointer;
+      accent-color: var(--accent);
+      flex-shrink: 0;
     }
+    .checkbox-row label {
+      font-size: 0.85rem;
+      font-weight: 400;
+      color: var(--ink-2);
+      line-height: 1.5;
+      cursor: pointer;
+    }
+    .checkbox-row label strong { color: var(--ink); font-weight: 500; }
 
-    /* ── Submit area ── */
+    /* ── Submit ── */
     .submit-area {
       display: flex;
       align-items: center;
-      gap: 16px;
-      padding-top: 8px;
+      gap: 14px;
+      margin-top: 24px;
     }
 
     .btn-primary {
@@ -308,36 +237,73 @@
       border-radius: var(--radius);
       padding: 10px 20px;
       cursor: pointer;
-      transition: border-color var(--transition), color var(--transition), background var(--transition);
+      transition: border-color var(--transition), color var(--transition);
       text-decoration: none;
     }
     .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
 
-    .submit-note {
-      font-size: 0.75rem;
-      color: var(--ink-3);
-      margin-left: auto;
-      font-family: var(--mono);
-    }
-
-    /* ── Flash messages ── */
+    /* ── Flash ── */
     .flash {
       padding: 12px 16px;
       border-radius: var(--radius);
       font-size: 0.85rem;
-      margin-bottom: 28px;
+      margin-bottom: 24px;
       display: none;
     }
     .flash.success { background: rgba(157,242,4,0.15); border: 1px solid rgba(157,242,4,0.5); color: var(--brand-green-dark); }
     .flash.error   { background: rgba(255,82,82,0.1);  border: 1px solid rgba(255,82,82,0.4); color: var(--accent-2); }
     .flash.show    { display: block; }
 
-    /* ── Responsive ── */
+    /* ── Helper sidebar ── */
+    .next-steps {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 22px 26px;
+    }
+    .next-steps-title {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--ink-2);
+      margin-bottom: 12px;
+    }
+    .next-steps-list {
+      list-style: none;
+      counter-reset: step;
+    }
+    .next-steps-list li {
+      counter-increment: step;
+      position: relative;
+      padding-left: 28px;
+      font-size: 0.85rem;
+      color: var(--ink-2);
+      line-height: 1.55;
+      margin-bottom: 8px;
+    }
+    .next-steps-list li:last-child { margin-bottom: 0; }
+    .next-steps-list li::before {
+      content: counter(step);
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 20px;
+      height: 20px;
+      background: var(--accent);
+      color: var(--ink-on-dark);
+      border-radius: 50%;
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
     @media (max-width: 620px) {
       .header { padding: 0 24px; }
       .page { padding: 36px 20px 0; }
-      .grid-2, .grid-3 { grid-template-columns: 1fr; }
-      .span-2 { grid-column: span 1; }
+      .form-card { padding: 24px 20px; }
     }
   </style>
 </head>
@@ -356,265 +322,114 @@
 </header>
 
 <main class="page">
-  <h1 class="page-title">Register <span>new client</span></h1>
-  <p class="page-desc">Fill in all required fields to onboard a client to the V2 pipeline. The GA4 service account must already have Viewer access to the client's property before running the first report.</p>
+  <h1 class="page-title">Register a <span>new client</span></h1>
+  <p class="page-desc">
+    Three required fields to create the client record. Everything else — page assets, screenshots, Voice of Customer, Search Console, ad creatives — is configured on the next page and is <strong>fully optional</strong>.
+  </p>
 
   <div id="flash" class="flash"></div>
 
-  <form id="onboard-form" novalidate>
+  <form id="onboard-form" class="form-card" novalidate>
 
-    <!-- 1. Identity -->
-    <div class="section">
-      <div class="section-header">
-        <span class="section-num">01</span>
-        <span class="section-title">Client identity</span>
-      </div>
-      <div class="grid-2">
-        <div class="field">
-          <label for="client_name">Client name <span class="req">required</span></label>
-          <input type="text" id="client_name" name="client_name" placeholder="e.g. Fitness First" required autocomplete="off">
-        </div>
-        <div class="field">
-          <label for="client_slug">URL slug <span class="req">required</span> <span class="hint">auto-generated</span></label>
-          <input type="text" id="client_slug" name="client_slug" placeholder="e.g. fitness-first" required autocomplete="off" pattern="[a-z0-9\-]+">
-          <div class="slug-preview" id="slug-preview">cablytics.onrender.com/v2/dashboard/…</div>
-        </div>
-        <div class="field">
-          <label for="ga4_property_id">GA4 property ID <span class="req">required</span></label>
-          <input type="text" id="ga4_property_id" name="ga4_property_id" placeholder="e.g. 123456789" required autocomplete="off">
-        </div>
-        <div class="field">
-          <label for="client_context">Business context <span class="hint">used in AI prompts</span></label>
-          <input type="text" id="client_context" name="client_context" placeholder="e.g. UK gym chain, primarily mobile traffic, DTC memberships" autocomplete="off">
-        </div>
-      </div>
+    <div class="field">
+      <label for="client_name">Client name <span class="hint">required</span></label>
+      <input type="text" id="client_name" name="client_name" placeholder="e.g. Fitness First — Bioage" required>
     </div>
 
-    <!-- 2. GA4 scope -->
-    <div class="section">
-      <div class="section-header">
-        <span class="section-num">02</span>
-        <span class="section-title">GA4 scope</span>
-      </div>
-      <div class="field">
-        <label for="target_urls">Target URLs <span class="hint">one per line</span></label>
-        <textarea id="target_urls" name="target_urls" rows="5" placeholder="/gym-locations/london&#10;/membership/join&#10;/classes&#10;/personal-training"></textarea>
-        <div class="field-meta" id="url-count">0 URLs</div>
-      </div>
+    <div class="field">
+      <label for="client_slug">Slug <span class="hint">used in URLs · letters, numbers, hyphens</span></label>
+      <input type="text" id="client_slug" name="client_slug" placeholder="e.g. fitness-first-bioage" required>
+      <div class="slug-preview">Dashboard URL: /v2/dashboard/<strong id="slug-preview-text">your-slug</strong></div>
     </div>
 
-    <!-- 3. Session insights -->
-    <div class="section">
-      <div class="section-header">
-        <span class="section-num">03</span>
-        <span class="section-title">Session recording insights</span>
-        <span class="section-note">Clarity Copilot / Hotjar observations</span>
-      </div>
-      <div class="field">
-        <label for="session_insights">Session insights <span class="hint">paste Clarity AI summary or manual observations</span></label>
-        <textarea id="session_insights" name="session_insights" rows="6" placeholder="e.g. 70% of mobile users rage-click the membership CTA on the homepage. Dead clicks on the nav menu on /find-a-gym. Users drop off at the gym selector step on mobile. Average scroll depth on /classes is 42%."></textarea>
-      </div>
+    <div class="field">
+      <label for="ga4_property_id">GA4 property ID <span class="hint">required · numeric only</span></label>
+      <input type="text" id="ga4_property_id" name="ga4_property_id" placeholder="e.g. 328159628" required>
     </div>
 
-    <!-- 4. Consumer research inputs -->
-    <div class="section">
-      <div class="section-header">
-        <span class="section-num">03</span>
-        <span class="section-title">Consumer research inputs</span>
-        <span class="section-note">Agent 3 data — set once, update periodically</span>
-      </div>
-      <div class="field" style="margin-bottom:16px">
-        <label for="customer_reviews">Customer reviews <span class="hint">100–300 reviews, plain text</span></label>
-        <textarea id="customer_reviews" name="customer_reviews" rows="8" placeholder="Paste Trustpilot / Google / Amazon reviews here. One review per paragraph is fine — no formatting needed."></textarea>
-        <div class="char-counter" id="reviews-counter">0 chars</div>
-      </div>
-      <div class="field" style="margin-bottom:16px">
-        <label for="competitor_notes">Competitor notes <span class="hint">optional</span></label>
-        <textarea id="competitor_notes" name="competitor_notes" rows="4" placeholder="Paste competitor review snippets or switching reasons observed on forums / Reddit."></textarea>
-      </div>
-      <div class="field">
-        <label for="current_pdp_copy">Current PDP / homepage copy <span class="hint">headline + first paragraph</span></label>
-        <textarea id="current_pdp_copy" name="current_pdp_copy" rows="4" placeholder="Paste the current homepage headline and first paragraph, or the key PDP headline and opening copy."></textarea>
-      </div>
+    <div class="checkbox-row">
+      <input type="checkbox" id="run_now" name="run_now">
+      <label for="run_now">
+        <strong>Run a first report immediately after creating</strong><br>
+        Recommended only if you've already configured page assets through the GA4 property setup. Otherwise leave unchecked, configure on the next page, then run.
+      </label>
     </div>
 
-    <!-- 5. Test sizing -->
-    <div class="section">
-      <div class="section-header">
-        <span class="section-num">04</span>
-        <span class="section-title">Test sizing</span>
-        <span class="section-note">Used by Agent 5 for calendar sizing</span>
-      </div>
-      <div class="grid-2">
-        <div class="field">
-          <label for="monthly_traffic">Monthly sessions <span class="hint">approx.</span></label>
-          <input type="number" id="monthly_traffic" name="monthly_traffic" placeholder="e.g. 85000" min="0">
-        </div>
-        <div class="field">
-          <label for="dev_hours_per_week">Dev hours / week <span class="hint">available for test builds</span></label>
-          <input type="number" id="dev_hours_per_week" name="dev_hours_per_week" placeholder="e.g. 8" min="0" max="168">
-        </div>
-      </div>
+    <div class="submit-area">
+      <button type="submit" class="btn-primary" id="submit-btn">Create client →</button>
+      <a href="/v2/admin/clients" class="btn-secondary">Cancel</a>
     </div>
-
-    <!-- 6. Schedule -->
-    <div class="section">
-      <div class="section-header">
-        <span class="section-num">05</span>
-        <span class="section-title">Report schedule</span>
-      </div>
-      <div class="grid-3">
-        <div class="field">
-          <label for="report_frequency">Frequency</label>
-          <select id="report_frequency" name="report_frequency" onchange="updateScheduleDay()">
-            <option value="weekly">Weekly</option>
-            <option value="monthly" selected>Monthly</option>
-          </select>
-        </div>
-        <div class="field">
-          <label for="schedule_day" id="schedule_day_label">Day of month</label>
-          <select id="schedule_day" name="schedule_day">
-            <option value="1">1st</option>
-            <option value="8">8th</option>
-            <option value="15">15th</option>
-            <option value="22">22nd</option>
-          </select>
-        </div>
-        <div class="field">
-          <label for="run_now">First run</label>
-          <select id="run_now" name="run_now">
-            <option value="yes">Trigger immediately on save</option>
-            <option value="no">Wait for first scheduled run</option>
-          </select>
-        </div>
-      </div>
-    </div>
-
-    <!-- 7. Submit -->
-    <div class="section">
-      <div class="divider"></div>
-      <div class="submit-area">
-        <button type="submit" class="btn-primary" id="submit-btn">Register client →</button>
-        <a href="/v2/admin/clients" class="btn-secondary">View all clients</a>
-        <span class="submit-note" id="submit-note">All required fields must be filled</span>
-      </div>
-    </div>
-
   </form>
+
+  <aside class="next-steps">
+    <div class="next-steps-title">What happens next</div>
+    <ol class="next-steps-list">
+      <li>Client record is created with sensible defaults (monthly schedule, 1st of the month).</li>
+      <li>You're taken to the edit page where you can add page assets, screenshots, VoC, Search Console URL, and ad creatives — all optional, all add value to the report.</li>
+      <li>When you're happy with the configuration, trigger a manual report run from the dashboard.</li>
+    </ol>
+  </aside>
 </main>
 
 <script>
-  const nameEl   = document.getElementById('client_name');
-  const slugEl   = document.getElementById('client_slug');
-  const preview  = document.getElementById('slug-preview');
-  const urlsEl   = document.getElementById('target_urls');
-  const urlCount = document.getElementById('url-count');
-  const reviewsEl     = document.getElementById('customer_reviews');
-  const reviewCounter = document.getElementById('reviews-counter');
-  const submitBtn  = document.getElementById('submit-btn');
-  const submitNote = document.getElementById('submit-note');
-  const flash      = document.getElementById('flash');
+  // ── Slug auto-suggest from client name + live preview ────────────────
+  const nameInput = document.getElementById('client_name');
+  const slugInput = document.getElementById('client_slug');
+  const slugPreview = document.getElementById('slug-preview-text');
+  let slugTouched = false;
 
-  let slugManuallyEdited = false;
-
-  function toSlug(s) {
+  function slugify(s) {
     return s.toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, '')
-      .trim()
-      .replace(/[\s]+/g, '-')
-      .replace(/-+/g, '-');
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '');
   }
 
-  nameEl.addEventListener('input', () => {
-    if (!slugManuallyEdited) {
-      slugEl.value = toSlug(nameEl.value);
-      updateSlugPreview();
+  nameInput.addEventListener('input', () => {
+    if (!slugTouched) {
+      slugInput.value = slugify(nameInput.value);
+      slugPreview.textContent = slugInput.value || 'your-slug';
     }
   });
 
-  slugEl.addEventListener('input', () => {
-    slugManuallyEdited = true;
-    slugEl.value = toSlug(slugEl.value);
-    updateSlugPreview();
-  });
-
-  function updateSlugPreview() {
-    const slug = slugEl.value;
-    if (slug) {
-      preview.textContent = 'cablytics.onrender.com/v2/dashboard/' + slug;
-      preview.classList.add('active');
-    } else {
-      preview.textContent = 'cablytics.onrender.com/v2/dashboard/…';
-      preview.classList.remove('active');
+  slugInput.addEventListener('input', () => {
+    slugTouched = true;
+    // Normalise as the user types — but keep their cursor position roughly stable
+    const cleaned = slugify(slugInput.value);
+    if (cleaned !== slugInput.value) {
+      slugInput.value = cleaned;
     }
-  }
-
-  urlsEl.addEventListener('input', () => {
-    const lines = urlsEl.value.split('\n').filter(l => l.trim().length > 0);
-    urlCount.textContent = lines.length + (lines.length === 1 ? ' URL' : ' URLs');
+    slugPreview.textContent = slugInput.value || 'your-slug';
   });
 
-  reviewsEl.addEventListener('input', () => {
-    const len = reviewsEl.value.length;
-    reviewCounter.textContent = len.toLocaleString() + ' chars';
-    reviewCounter.classList.toggle('warn', len > 8000 && len <= 12000);
-    reviewCounter.classList.toggle('full', len > 12000);
-  });
+  // ── Submit ───────────────────────────────────────────────────────────
+  const flash = document.getElementById('flash');
+  const submitBtn = document.getElementById('submit-btn');
 
-  function updateScheduleDay() {
-    const freq  = document.getElementById('report_frequency').value;
-    const label = document.getElementById('schedule_day_label');
-    const sel   = document.getElementById('schedule_day');
-    if (freq === 'weekly') {
-      label.textContent = 'Day of week';
-      sel.innerHTML = `
-        <option value="mon">Monday</option>
-        <option value="tue">Tuesday</option>
-        <option value="wed">Wednesday</option>
-        <option value="thu">Thursday</option>
-        <option value="fri">Friday</option>
-      `;
-    } else {
-      label.textContent = 'Day of month';
-      sel.innerHTML = `
-        <option value="1">1st</option>
-        <option value="8">8th</option>
-        <option value="15">15th</option>
-        <option value="22">22nd</option>
-      `;
-    }
+  function showFlash(type, msg) {
+    flash.className = 'flash ' + type + ' show';
+    flash.textContent = msg;
+    flash.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
   document.getElementById('onboard-form').addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    const required = ['client_name', 'client_slug', 'ga4_property_id'];
-    const missing = required.filter(id => !document.getElementById(id).value.trim());
-    if (missing.length) {
-      showFlash('error', 'Please fill in all required fields: ' + missing.map(id => id.replace(/_/g, ' ')).join(', ') + '.');
-      return;
-    }
-
-    submitBtn.textContent = 'Registering…';
+    submitBtn.textContent = 'Creating…';
     submitBtn.disabled = true;
-    submitNote.textContent = '';
 
     const payload = {
-      client_name:        document.getElementById('client_name').value.trim(),
-      client_slug:        document.getElementById('client_slug').value.trim(),
-      ga4_property_id:    document.getElementById('ga4_property_id').value.trim(),
-      session_insights:   document.getElementById('session_insights').value.trim(),
-      client_context:     document.getElementById('client_context').value.trim(),
-      target_urls:        document.getElementById('target_urls').value.trim(),
-      customer_reviews:   document.getElementById('customer_reviews').value.trim(),
-      competitor_notes:   document.getElementById('competitor_notes').value.trim(),
-      current_pdp_copy:   document.getElementById('current_pdp_copy').value.trim(),
-      monthly_traffic:    parseInt(document.getElementById('monthly_traffic').value) || null,
-      dev_hours_per_week: parseInt(document.getElementById('dev_hours_per_week').value) || null,
-      report_frequency:   document.getElementById('report_frequency').value,
-      schedule_day:       document.getElementById('schedule_day').value,
-      run_now:            document.getElementById('run_now').value === 'yes',
+      client_name:     nameInput.value.trim(),
+      client_slug:     slugInput.value.trim(),
+      ga4_property_id: document.getElementById('ga4_property_id').value.trim(),
+      run_now:         document.getElementById('run_now').checked,
     };
+
+    if (!payload.client_name || !payload.client_slug || !payload.ga4_property_id) {
+      showFlash('error', 'Please fill in all three required fields.');
+      submitBtn.textContent = 'Create client →';
+      submitBtn.disabled = false;
+      return;
+    }
 
     try {
       const res = await fetch('/v2/client/create', {
@@ -625,31 +440,24 @@
       const data = await res.json();
 
       if (res.ok) {
-        showFlash('success', `Client "${payload.client_name}" registered. Dashboard: /v2/dashboard/${payload.client_slug}${payload.run_now ? ' — first report triggered.' : ''}`);
-        document.getElementById('onboard-form').reset();
-        slugManuallyEdited = false;
-        preview.textContent = 'cablytics.onrender.com/v2/dashboard/…';
-        preview.classList.remove('active');
-        urlCount.textContent = '0 URLs';
-        reviewCounter.textContent = '0 chars';
-        submitNote.textContent = 'Client saved successfully';
+        showFlash('success', 'Client created. Taking you to the configuration page…');
+        // Redirect to edit page with the just_created flag, so the user lands
+        // on a banner inviting them to fill in the optional fields.
+        setTimeout(() => {
+          window.location.href = `/v2/admin/edit/${payload.client_slug}?just_created=1`;
+        }, 800);
       } else {
-        showFlash('error', data.error || 'Something went wrong. Check the Render logs.');
+        showFlash('error', data.error || 'Could not create client.');
+        submitBtn.textContent = 'Create client →';
+        submitBtn.disabled = false;
       }
     } catch (err) {
-      showFlash('error', 'Network error — is the server running?');
+      showFlash('error', 'Network error. Is the server running?');
+      submitBtn.textContent = 'Create client →';
+      submitBtn.disabled = false;
     }
-
-    submitBtn.textContent = 'Register client →';
-    submitBtn.disabled = false;
   });
-
-  function showFlash(type, msg) {
-    flash.className = 'flash ' + type + ' show';
-    flash.textContent = msg;
-    flash.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    setTimeout(() => flash.classList.remove('show'), 8000);
-  }
 </script>
+
 </body>
 </html>
