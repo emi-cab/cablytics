@@ -672,37 +672,3 @@ def admin_edit(slug):
                            valid_page_types=sorted(VALID_PAGE_TYPES),
                            valid_ad_platforms=sorted(VALID_AD_PLATFORMS),
                            valid_ad_formats=sorted(VALID_AD_FORMATS))
-
-
-# ============================================================
-# TEMPORARY — verifies CSV parsers work on Render.
-# Remove after step 2 verification is complete.
-# ============================================================
-@v2.route('/_test_parsers', methods=['GET'])
-def _test_parsers():
-    import io
-    from v2.gsc_parser import parse_gsc_csv
-    from v2.ga4_parser import parse_ga4_csv
-
-    gsc_sample = (
-        '\ufeffTop pages,Clicks,Impressions,CTR,Position\n'
-        '/test-page,100,2000,5.00%,3.5\n'
-        '/another-page,50,1500,3.33%,7.2\n'
-    )
-    ga4_sample = (
-        'Page path,Sessions,Total users,Event count\n'
-        '/test-page,500,400,2500\n'
-        '/another-page,250,200,1100\n'
-    )
-
-    try:
-        gsc = parse_gsc_csv(io.BytesIO(gsc_sample.encode('utf-8')))
-        ga4 = parse_ga4_csv(io.BytesIO(ga4_sample.encode('utf-8')))
-        return {
-            'gsc_ok': gsc['row_count'] == 2 and gsc['total_clicks'] == 150,
-            'ga4_ok': ga4['row_count'] == 2 and ga4['total_sessions'] == 750,
-            'gsc_result': gsc,
-            'ga4_result': ga4,
-        }
-    except Exception as e:
-        return {'error': str(e), 'type': type(e).__name__}, 500
