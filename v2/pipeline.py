@@ -5,6 +5,12 @@ Phase 4 changes:
   • Agent 3 now collects Search Console data (gsc_queries.collect_gsc_data)
     when the client has a gsc_site_url configured. GSC failures are non-fatal
     — Agent 3 still runs with VoC only on error.
+
+Phase 7 changes (manual CSV path):
+  • run_pipeline() accepts an optional manual_upload_id.
+  • When provided, Agents 1 and 3 build their data summaries from the
+    manual_data_uploads row instead of calling the GA4/GSC APIs.
+  • The API path is unchanged when manual_upload_id is None.
 """
 
 import os
@@ -22,9 +28,15 @@ from v2.db import (
     get_client_by_slug,
     list_page_assets,
     list_ad_creatives,
+    get_manual_upload,
+    update_manual_upload,
 )
 from v2.ga4_queries_v2 import collect_funnel_data, build_funnel_summary
 from v2.gsc_queries import collect_gsc_data, build_gsc_summary
+from v2.manual_summaries import (
+    build_funnel_summary_from_csv,
+    build_gsc_summary_from_csv,
+)
 from v2.prompts_v2 import (
     agent1_prompt,
     agent2_prompt,
@@ -109,21 +121,36 @@ def _enrich_ad_creatives_with_urls(ad_creatives: list[dict]) -> list[dict]:
 
 # ── Individual agent runners ───────────────────────────────────────────────────
 
-def run_agent1(client_data: dict, report_id: int) -> dict:
-    """Funnel Analyst — pulls GA4 data and identifies revenue leaks."""
+def run_agent1(client_data: dict, report_id: int,
+               manual_upload: dict | None = None) -> dict:
+    """
+    Funnel Analyst — pulls GA4 data and identifies revenue leaks.
+
+    If `manual_upload` is provided, builds the funnel summary from that CSV
+    upload instead of calling the GA4 API.
+    """
     client_id   = client_data["id"]
-    property_id = client_data["ga4_property_id"]
     context     = client_data.get("client_context", "")
     session_insights = client_data.get("session_insights", "")
 
     page_assets = list_page_assets(client_id)
-    urls = [a["url"] for a in page_assets if a.get("url")]
 
-    log_event(client_id, "agent_started", report_id=report_id, agent_number=1,
-              message=f"Collecting GA4 data ({len(urls)} URLs)")
+    if manual_upload:
+        # CSV path — no API call
+        log_event(client_id, "agent_started", report_id=report_id, agent_number=1,
+                  message=f"Building funnel summary from manual CSV upload "
+                          f"(upload_id={manual_upload.get('id')})")
+        funnel_summary = build_funnel_summary_from_csv(manual_upload)
+    else:
+        # API path — unchanged
+        property_id = client_data["ga4_property_id"]
+        urls = [a["url"] for a in page_assets if a.get("url")]
 
-    ga4_result     = collect_funnel_data(property_id, urls)
-    funnel_summary = build_funnel_summary(ga4_result)
+        log_event(client_id, "agent_started", report_id=report_id, agent_number=1,
+                  message=f"Collecting GA4 data ({len(urls)} URLs)")
+
+        ga4_result     = collect_funnel_data(property_id, urls)
+        funnel_summary = build_funnel_summary(ga4_result)
 
     log_event(client_id, "agent_started", report_id=report_id, agent_number=1, message="Calling Claude API")
 
@@ -156,31 +183,43 @@ def run_agent2(agent1_output: dict, client_data: dict, report_id: int) -> dict:
     return output
 
 
-def run_agent3(client_data: dict, report_id: int) -> dict:
-    """Consumer Researcher — mines VoC + GSC and surfaces CEPs."""
+def run_agent3(client_data: dict, report_id: int,
+               manual_upload: dict | None = None) -> dict:
+    """
+    Consumer Researcher — mines VoC + GSC and surfaces CEPs.
+
+    If `manual_upload` is provided, builds the GSC summary from that CSV
+    upload instead of calling the GSC API.
+    """
     client_id        = client_data["id"]
     voc_volunteered  = client_data.get("voc_volunteered", "")
     voc_solicited    = client_data.get("voc_solicited", "")
     competitor_notes = client_data.get("competitor_notes", "")
     context          = client_data.get("client_context", "")
-    gsc_site_url     = client_data.get("gsc_site_url", "")
 
     page_assets = list_page_assets(client_id)
-
-    # GSC enrichment — non-fatal on failure
     gsc_summary = ""
-    if gsc_site_url:
+
+    if manual_upload:
+        # CSV path — no GSC API call
+        gsc_summary = build_gsc_summary_from_csv(manual_upload)
         log_event(client_id, "agent_started", report_id=report_id, agent_number=3,
-                  message=f"Fetching Search Console data for {gsc_site_url}")
-        gsc_data = collect_gsc_data(gsc_site_url, days=28)
-        gsc_summary = build_gsc_summary(gsc_data)
-        if gsc_data.get("error"):
+                  message="Building GSC summary from manual CSV upload")
+    else:
+        # API path — unchanged
+        gsc_site_url = client_data.get("gsc_site_url", "")
+        if gsc_site_url:
             log_event(client_id, "agent_started", report_id=report_id, agent_number=3,
-                      message=f"GSC unavailable — continuing without it: {gsc_data['error']}")
+                      message=f"Fetching Search Console data for {gsc_site_url}")
+            gsc_data = collect_gsc_data(gsc_site_url, days=28)
+            gsc_summary = build_gsc_summary(gsc_data)
+            if gsc_data.get("error"):
+                log_event(client_id, "agent_started", report_id=report_id, agent_number=3,
+                          message=f"GSC unavailable — continuing without it: {gsc_data['error']}")
 
     log_event(client_id, "agent_started", report_id=report_id, agent_number=3,
               message=f"Analysing VoC ({len(page_assets)} page assets, "
-                      f"GSC: {'on' if gsc_site_url else 'off'})")
+                      f"GSC: {'manual CSV' if manual_upload else ('on' if client_data.get('gsc_site_url') else 'off')})")
 
     system, user = agent3_prompt(
         voc_volunteered, voc_solicited, competitor_notes,
@@ -243,18 +282,47 @@ def run_agent5(agent2_output: dict, client_data: dict, report_id: int) -> dict:
 
 # ── Main pipeline orchestrator ─────────────────────────────────────────────────
 
-def run_pipeline(client_slug: str, triggered_by: str = "manual"):
+def run_pipeline(client_slug: str, triggered_by: str = "manual",
+                 manual_upload_id: int | None = None):
+    """
+    Run the full 5-agent pipeline for a client.
+
+    Args:
+        client_slug: which client to run for
+        triggered_by: 'manual', 'scheduled', or 'manual_csv'
+        manual_upload_id: if provided, Agents 1 and 3 use the parsed CSV data
+            from that upload row instead of calling the GA4/GSC APIs.
+    """
     client_data = get_client_by_slug(client_slug)
     if not client_data:
         print(f"[V2][Pipeline] Client not found: {client_slug}", flush=True)
         return
 
     client_id = client_data["id"]
+
+    # Load the manual upload up front if specified, so we fail fast on bad input
+    manual_upload = None
+    if manual_upload_id is not None:
+        manual_upload = get_manual_upload(manual_upload_id)
+        if not manual_upload:
+            print(f"[V2][Pipeline] Manual upload not found: {manual_upload_id}",
+                  flush=True)
+            return
+        if manual_upload["client_id"] != client_id:
+            print(f"[V2][Pipeline] Manual upload {manual_upload_id} belongs to a "
+                  f"different client — refusing.", flush=True)
+            return
+
     report    = create_report(client_id, triggered_by=triggered_by)
     report_id = report["id"]
 
+    # Link the upload to the report (audit trail) before we start running
+    if manual_upload:
+        update_manual_upload(manual_upload_id, {"report_id": report_id})
+
     log_event(client_id, "pipeline_started", report_id=report_id,
-              message=f"Triggered by: {triggered_by}")
+              message=f"Triggered by: {triggered_by}"
+                      + (f" | manual_upload_id={manual_upload_id}" if manual_upload_id else ""))
 
     from v2.db import get_connection, DATABASE_URL
     with get_connection() as conn:
@@ -264,7 +332,9 @@ def run_pipeline(client_slug: str, triggered_by: str = "manual"):
         else:
             conn.execute("UPDATE reports SET status = 'running' WHERE id = ?", (report_id,))
 
-    print(f"[V2][Pipeline] Starting | client={client_slug} | report_id={report_id}", flush=True)
+    print(f"[V2][Pipeline] Starting | client={client_slug} | report_id={report_id}"
+          f"{' | manual_upload_id=' + str(manual_upload_id) if manual_upload_id else ''}",
+          flush=True)
 
     try:
         agent1_result = {}
@@ -274,14 +344,18 @@ def run_pipeline(client_slug: str, triggered_by: str = "manual"):
 
         def _run1():
             try:
-                agent1_result.update(run_agent1(client_data, report_id))
+                agent1_result.update(
+                    run_agent1(client_data, report_id, manual_upload=manual_upload)
+                )
             except Exception as e:
                 agent1_error.append(str(e))
                 print(f"[V2][Agent1] ERROR: {e}", flush=True)
 
         def _run3():
             try:
-                agent3_result.update(run_agent3(client_data, report_id))
+                agent3_result.update(
+                    run_agent3(client_data, report_id, manual_upload=manual_upload)
+                )
             except Exception as e:
                 agent3_error.append(str(e))
                 print(f"[V2][Agent3] ERROR: {e}", flush=True)

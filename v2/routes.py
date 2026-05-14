@@ -840,9 +840,12 @@ def manual_upload_validate(slug, upload_id):
     )
 
 
+# REPLACEMENT for the manual_upload_run function at the bottom of v2/routes.py.
+# Find the existing function and replace it with this one.
+
 @v2.route("/admin/edit/<slug>/upload/<int:upload_id>/run", methods=["POST"])
 def manual_upload_run(slug, upload_id):
-    """User confirmed the data — mark validated and (later) kick off the pipeline."""
+    """User confirmed the data — validate dates and kick off the pipeline."""
     client = get_client_by_slug(slug)
     if not client:
         abort(404)
@@ -851,6 +854,7 @@ def manual_upload_run(slug, upload_id):
     if not upload or upload["client_id"] != client["id"]:
         abort(404)
 
+    # Accept JSON (from fetch) or form-encoded (from a plain <form>)
     payload = request.get_json(silent=True) or request.form
 
     date_start = (payload.get("date_range_start") or "").strip()
@@ -858,6 +862,7 @@ def manual_upload_run(slug, upload_id):
     if not date_start or not date_end:
         return jsonify({"error": "Date range is required."}), 400
 
+    # Validate ISO format (YYYY-MM-DD)
     from datetime import date as _date
     try:
         _date.fromisoformat(date_start)
@@ -868,15 +873,39 @@ def manual_upload_run(slug, upload_id):
     if date_start > date_end:
         return jsonify({"error": "Start date must be before end date."}), 400
 
+    # Save the confirmed dates and mark the upload validated
     update_manual_upload(upload_id, {
         "date_range_start": date_start,
         "date_range_end": date_end,
         "validated": True,
     })
 
+    # Refuse if a pipeline is already running for this client
+    if get_active_report(client["id"]):
+        return jsonify({
+            "error": "A report is already running for this client. "
+                     "Wait for it to finish before starting another."
+        }), 409
+
+    # Kick off the pipeline in a background thread so the HTTP request
+    # returns immediately. This matches the existing manual-run pattern
+    # used by /v2/report/run.
+    def _run():
+        try:
+            run_pipeline(
+                client_slug=slug,
+                triggered_by="manual_csv",
+                manual_upload_id=upload_id,
+            )
+        except Exception as e:
+            print(f"[V2][Pipeline] Background thread crashed for {slug} "
+                  f"(upload {upload_id}): {e}", flush=True)
+
+    threading.Thread(target=_run, daemon=True).start()
+
     return jsonify({
         "ok": True,
         "upload_id": upload_id,
-        "message": "Upload validated. Pipeline hand-off lands in step 4.",
-        "next": f"/v2/admin/edit/{slug}",
+        "message": "Pipeline started. Redirecting to the client dashboard…",
+        "next": f"/v2/dashboard/{slug}",
     })
