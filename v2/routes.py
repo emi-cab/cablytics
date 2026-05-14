@@ -56,9 +56,14 @@ from v2.db import (
     delete_ad_creative,
     VALID_AD_PLATFORMS,
     VALID_AD_FORMATS,
+    create_manual_upload,
+    get_manual_upload,
+    update_manual_upload,
 )
 from v2.pipeline import run_pipeline
 from v2.scheduler import register_client_job
+from v2.gsc_parser import parse_gsc_csv, GSCParseError, preview_rows as gsc_preview
+from v2.ga4_parser import parse_ga4_csv, GA4ParseError, preview_rows as ga4_preview
 from v2.storage import (
     upload_screenshot,
     upload_ad_creative,
@@ -672,3 +677,206 @@ def admin_edit(slug):
                            valid_page_types=sorted(VALID_PAGE_TYPES),
                            valid_ad_platforms=sorted(VALID_AD_PLATFORMS),
                            valid_ad_formats=sorted(VALID_AD_FORMATS))
+
+
+# ── Manual CSV upload (Phase 7) ────────────────────────────────────────────────
+#
+# Lets the admin upload GA4/GSC CSV exports for a client and run the pipeline
+# from that data instead of the API. Useful when service-account access to a
+# client's GA4 property is pending, or for one-off audits.
+#
+# Endpoints:
+#   GET  /v2/admin/edit/<slug>/upload                — upload form
+#   POST /v2/admin/edit/<slug>/upload/parse          — parse + store CSVs
+#   GET  /v2/admin/edit/<slug>/upload/<id>/validate  — preview + confirm
+#   POST /v2/admin/edit/<slug>/upload/<id>/run       — kick off pipeline
+
+
+@v2.route("/admin/edit/<slug>/upload", methods=["GET"])
+def manual_upload_form(slug):
+    client = get_client_by_slug(slug)
+    if not client:
+        abort(404)
+    return render_template(
+        "admin_manual_upload.html",
+        client=client,
+    )
+
+
+@v2.route("/admin/edit/<slug>/upload/parse", methods=["POST"])
+def manual_upload_parse(slug):
+    """
+    Accept up to three files: ga4_csv, gsc_pages_csv, gsc_queries_csv.
+    At least one must be provided.
+    """
+    client = get_client_by_slug(slug)
+    if not client:
+        abort(404)
+
+    ga4_file = request.files.get("ga4_csv")
+    gsc_pages_file = request.files.get("gsc_pages_csv")
+    gsc_queries_file = request.files.get("gsc_queries_csv")
+
+    if not (
+        (ga4_file and ga4_file.filename)
+        or (gsc_pages_file and gsc_pages_file.filename)
+        or (gsc_queries_file and gsc_queries_file.filename)
+    ):
+        return jsonify({"error": "Upload at least one CSV file."}), 400
+
+    # Quick extension check
+    for f in (ga4_file, gsc_pages_file, gsc_queries_file):
+        if f and f.filename and not f.filename.lower().endswith(".csv"):
+            return jsonify({"error": f"{f.filename} is not a CSV file."}), 400
+
+    errors = {}
+    parsed = {}
+    detected_date_range = None
+
+    # ---- GA4 ----
+    if ga4_file and ga4_file.filename:
+        exclude_web_pixels = request.form.get("exclude_web_pixels", "true") == "true"
+        try:
+            ga4_result = parse_ga4_csv(ga4_file.stream, exclude_web_pixels=exclude_web_pixels)
+            parsed["ga4"] = ga4_result
+            if ga4_result.get("detected_date_range"):
+                detected_date_range = ga4_result["detected_date_range"]
+        except GA4ParseError as e:
+            errors["ga4"] = str(e)
+
+    # ---- GSC Pages ----
+    if gsc_pages_file and gsc_pages_file.filename:
+        try:
+            pages_result = parse_gsc_csv(gsc_pages_file.stream)
+            if pages_result["source_type"] != "pages":
+                errors["gsc_pages"] = (
+                    f"Expected a Pages export but file appears to be {pages_result['source_type']}."
+                )
+            else:
+                parsed["gsc_pages"] = pages_result
+        except GSCParseError as e:
+            errors["gsc_pages"] = str(e)
+
+    # ---- GSC Queries ----
+    if gsc_queries_file and gsc_queries_file.filename:
+        try:
+            queries_result = parse_gsc_csv(gsc_queries_file.stream)
+            if queries_result["source_type"] != "queries":
+                errors["gsc_queries"] = (
+                    f"Expected a Queries export but file appears to be {queries_result['source_type']}."
+                )
+            else:
+                parsed["gsc_queries"] = queries_result
+        except GSCParseError as e:
+            errors["gsc_queries"] = str(e)
+
+    # Surface any individual parse failures, but proceed if at least one parsed.
+    if not parsed:
+        return jsonify({"errors": errors or {"general": "Nothing parseable."}}), 400
+
+    upload = create_manual_upload(client["id"], {
+        "ga4_data": parsed.get("ga4"),
+        "gsc_pages_data": parsed.get("gsc_pages"),
+        "gsc_queries_data": parsed.get("gsc_queries"),
+        "date_range_start": detected_date_range[0] if detected_date_range else None,
+        "date_range_end": detected_date_range[1] if detected_date_range else None,
+    })
+
+    return jsonify({
+        "upload_id": upload["id"],
+        "partial_errors": errors,
+        "next": f"/v2/admin/edit/{slug}/upload/{upload['id']}/validate",
+    })
+
+
+@v2.route("/admin/edit/<slug>/upload/<int:upload_id>/validate", methods=["GET"])
+def manual_upload_validate(slug, upload_id):
+    """Show parsed preview; user confirms date range and triggers pipeline."""
+    client = get_client_by_slug(slug)
+    if not client:
+        abort(404)
+
+    upload = get_manual_upload(upload_id)
+    if not upload or upload["client_id"] != client["id"]:
+        abort(404)
+
+    summary = {"ga4": None, "gsc_pages": None, "gsc_queries": None}
+
+    if upload.get("ga4_data"):
+        g = upload["ga4_data"]
+        summary["ga4"] = {
+            "row_count": g.get("row_count", 0),
+            "total_sessions": g.get("total_sessions", 0),
+            "total_users": g.get("total_users", 0),
+            "web_pixels_excluded": g.get("web_pixels_rows_excluded", 0),
+            "top_rows": ga4_preview(g, n=5),
+            "over_recommended_limit": g.get("row_count", 0) > 8,
+            "columns_present": g.get("columns_present", []),
+        }
+
+    if upload.get("gsc_pages_data"):
+        p = upload["gsc_pages_data"]
+        summary["gsc_pages"] = {
+            "row_count": p.get("row_count", 0),
+            "total_clicks": p.get("total_clicks", 0),
+            "total_impressions": p.get("total_impressions", 0),
+            "top_rows": gsc_preview(p, n=5),
+        }
+
+    if upload.get("gsc_queries_data"):
+        q = upload["gsc_queries_data"]
+        summary["gsc_queries"] = {
+            "row_count": q.get("row_count", 0),
+            "total_clicks": q.get("total_clicks", 0),
+            "total_impressions": q.get("total_impressions", 0),
+            "top_rows": gsc_preview(q, n=5),
+        }
+
+    return render_template(
+        "admin_manual_upload_validate.html",
+        client=client,
+        upload=upload,
+        summary=summary,
+    )
+
+
+@v2.route("/admin/edit/<slug>/upload/<int:upload_id>/run", methods=["POST"])
+def manual_upload_run(slug, upload_id):
+    """User confirmed the data — mark validated and (later) kick off the pipeline."""
+    client = get_client_by_slug(slug)
+    if not client:
+        abort(404)
+
+    upload = get_manual_upload(upload_id)
+    if not upload or upload["client_id"] != client["id"]:
+        abort(404)
+
+    payload = request.get_json(silent=True) or request.form
+
+    date_start = (payload.get("date_range_start") or "").strip()
+    date_end = (payload.get("date_range_end") or "").strip()
+    if not date_start or not date_end:
+        return jsonify({"error": "Date range is required."}), 400
+
+    from datetime import date as _date
+    try:
+        _date.fromisoformat(date_start)
+        _date.fromisoformat(date_end)
+    except ValueError:
+        return jsonify({"error": "Dates must be in YYYY-MM-DD format."}), 400
+
+    if date_start > date_end:
+        return jsonify({"error": "Start date must be before end date."}), 400
+
+    update_manual_upload(upload_id, {
+        "date_range_start": date_start,
+        "date_range_end": date_end,
+        "validated": True,
+    })
+
+    return jsonify({
+        "ok": True,
+        "upload_id": upload_id,
+        "message": "Upload validated. Pipeline hand-off lands in step 4.",
+        "next": f"/v2/admin/edit/{slug}",
+    })
