@@ -681,8 +681,8 @@ def admin_edit(slug):
 @v2.route('/_test_parsers', methods=['GET'])
 def _test_parsers():
     import io
-    from v2.gsc_csv_parser import parse_gsc_csv
-    from v2.ga4_csv_parser import parse_ga4_csv
+    from v2.gsc_parser import parse_gsc_csv
+    from v2.ga4_parser import parse_ga4_csv
 
     gsc_sample = (
         '\ufeffTop pages,Clicks,Impressions,CTR,Position\n'
