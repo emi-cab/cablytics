@@ -867,3 +867,173 @@ def delete_ad_creative(ad_id: int) -> bool:
         else:
             result = conn.execute("DELETE FROM client_ad_creatives WHERE id = ?", (ad_id,))
             return result.rowcount > 0
+
+
+# ── Manual data uploads (CSV path) ─────────────────────────────────────────────
+#
+# Stores parsed GA4/GSC CSV uploads before they're handed to the pipeline.
+# Mirrors the conventions used by clients / client_page_assets:
+#   • SERIAL id, integer client_id with FK to clients(id)
+#   • TEXT timestamps via now_utc()
+#   • dual postgres/sqlite branching with PLACEHOLDER
+#
+# JSONB columns (postgres) / TEXT columns (sqlite) store the normalised dicts
+# returned by ga4_parser.parse_ga4_csv() and gsc_parser.parse_gsc_csv().
+# On read we parse JSON back into dicts so callers get the same shape as the
+# parsers return.
+
+
+def _serialise_json(value):
+    """None → None; dict/list → JSON string for storage."""
+    if value is None:
+        return None
+    return json.dumps(value, ensure_ascii=True)
+
+
+def _deserialise_json(value):
+    """
+    Postgres JSONB columns come back as already-parsed dict/list via
+    psycopg2.extras.RealDictCursor. SQLite stores them as TEXT, so we parse.
+    Returns None unchanged.
+    """
+    if value is None:
+        return None
+    if isinstance(value, (dict, list)):
+        return value
+    try:
+        return json.loads(value)
+    except (TypeError, json.JSONDecodeError):
+        return None
+
+
+def _hydrate_manual_upload(row: dict | None) -> dict | None:
+    """Convert raw DB row into the shape callers expect."""
+    if not row:
+        return None
+    row = dict(row)
+    row["ga4_data"] = _deserialise_json(row.get("ga4_data"))
+    row["gsc_pages_data"] = _deserialise_json(row.get("gsc_pages_data"))
+    row["gsc_queries_data"] = _deserialise_json(row.get("gsc_queries_data"))
+    return row
+
+
+def create_manual_upload(client_id: int, data: dict) -> dict:
+    """
+    Insert a new manual upload row. `data` may contain:
+        ga4_data, gsc_pages_data, gsc_queries_data — parser results (dicts)
+        date_range_start, date_range_end — ISO date strings or None
+        notes — optional free text
+
+    Returns the created row with JSON fields hydrated back to dicts.
+    """
+    ts = now_utc()
+    values = (
+        client_id,
+        ts,
+        data.get("date_range_start"),
+        data.get("date_range_end"),
+        _serialise_json(data.get("ga4_data")),
+        _serialise_json(data.get("gsc_pages_data")),
+        _serialise_json(data.get("gsc_queries_data")),
+        data.get("notes"),
+        ts,
+        ts,
+    )
+
+    cols = (
+        "client_id, uploaded_at, date_range_start, date_range_end, "
+        "ga4_data, gsc_pages_data, gsc_queries_data, notes, "
+        "created_at, updated_at"
+    )
+
+    with get_connection() as conn:
+        if DATABASE_URL:
+            with conn.cursor() as cur:
+                cur.execute(f"""
+                    INSERT INTO manual_data_uploads ({cols})
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    RETURNING *
+                """, values)
+                row = cur.fetchone()
+                return _hydrate_manual_upload(dict(row) if row else None)
+        else:
+            cur = conn.execute(f"""
+                INSERT INTO manual_data_uploads ({cols})
+                VALUES (?,?,?,?,?,?,?,?,?,?)
+            """, values)
+            row = conn.execute(
+                "SELECT * FROM manual_data_uploads WHERE id = ?", (cur.lastrowid,)
+            ).fetchone()
+            return _hydrate_manual_upload(dict(row) if row else None)
+
+
+def get_manual_upload(upload_id: int) -> dict | None:
+    with get_connection() as conn:
+        if DATABASE_URL:
+            with conn.cursor() as cur:
+                row = _row(cur, f"SELECT * FROM manual_data_uploads WHERE id = {PLACEHOLDER}", (upload_id,))
+        else:
+            row = _row(conn, "SELECT * FROM manual_data_uploads WHERE id = ?", (upload_id,))
+    return _hydrate_manual_upload(row)
+
+
+def list_manual_uploads(client_id: int, limit: int = 20) -> list[dict]:
+    with get_connection() as conn:
+        if DATABASE_URL:
+            with conn.cursor() as cur:
+                rows = _rows(cur, """
+                    SELECT * FROM manual_data_uploads
+                    WHERE client_id = %s
+                    ORDER BY uploaded_at DESC LIMIT %s
+                """, (client_id, limit))
+        else:
+            rows = _rows(conn, """
+                SELECT * FROM manual_data_uploads
+                WHERE client_id = ?
+                ORDER BY uploaded_at DESC LIMIT ?
+            """, (client_id, limit))
+    return [_hydrate_manual_upload(r) for r in rows]
+
+
+def update_manual_upload(upload_id: int, data: dict) -> dict | None:
+    """
+    Update fields on an existing upload. Useful for the validation step
+    (confirming/correcting the date range and marking validated=True).
+    """
+    allowed = {
+        "date_range_start", "date_range_end",
+        "validated", "report_id", "notes",
+    }
+    updates = {k: v for k, v in data.items() if k in allowed}
+    if not updates:
+        return get_manual_upload(upload_id)
+
+    updates["updated_at"] = now_utc()
+    set_clause = ", ".join(f"{k} = {PLACEHOLDER}" for k in updates)
+    values = list(updates.values()) + [upload_id]
+
+    with get_connection() as conn:
+        if DATABASE_URL:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"UPDATE manual_data_uploads SET {set_clause} WHERE id = {PLACEHOLDER}",
+                    values,
+                )
+        else:
+            conn.execute(
+                f"UPDATE manual_data_uploads SET {set_clause} WHERE id = ?",
+                values,
+            )
+
+    return get_manual_upload(upload_id)
+
+
+def delete_manual_upload(upload_id: int) -> bool:
+    with get_connection() as conn:
+        if DATABASE_URL:
+            with conn.cursor() as cur:
+                cur.execute(f"DELETE FROM manual_data_uploads WHERE id = {PLACEHOLDER}", (upload_id,))
+                return cur.rowcount > 0
+        else:
+            result = conn.execute("DELETE FROM manual_data_uploads WHERE id = ?", (upload_id,))
+            return result.rowcount > 0
