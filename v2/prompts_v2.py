@@ -12,155 +12,40 @@ Phase 4 changes:
 
 # ── Agent 1: Funnel Analyst ────────────────────────────────────────────────────
 
-"""
-Drop-in replacement for the existing agent1_prompt() function in CABlytics V2.
-
-Key changes vs the current version:
-
-  1. Function automatically detects which inputs are populated and builds an
-     INPUT AVAILABILITY declaration. The agent knows what it has before it
-     starts reasoning.
-
-  2. System prompt has a new "Adaptive depth" section that scales behavioural
-     inference to what the data actually supports. With GA4 only, the agent
-     stays close to the numbers. With session insights present, it can
-     reason about behaviour. It does not speculate about behaviour when only
-     numbers are available.
-
-  3. New `input_audit` block at the top of the JSON output makes the data
-     situation visible to the consultant.
-
-  4. Signature is unchanged — drop-in replacement. No orchestrator changes
-     required.
-
-Assumes the existing helpers `_is_present()` and `_format_page_assets_for_agent1()`
-are present in the same file (the former was added with the Agent 3 update).
-If `_is_present()` is not already imported/defined, copy it in from the
-Agent 3 file.
-"""
-
-
-def _build_agent1_availability_block(funnel_summary, session_insights,
-                                     page_assets, client_context) -> str:
-    """
-    Build the INPUT AVAILABILITY declaration that prefixes the user message
-    for Agent 1. Tells the agent what's actually populated for this run.
-    """
-    def status(label: str, value, extra: str = "") -> str:
-        if _is_present(value):
-            tag = "PRESENT"
-            if extra:
-                tag += f" — {extra}"
-            return f"  {label}: {tag}"
-        return f"  {label}: NOT AVAILABLE for this run"
-
-    # Try to give the agent a sense of GA4 data volume.
-    funnel_extra = ""
-    if _is_present(funnel_summary) and isinstance(funnel_summary, str):
-        word_count = len(funnel_summary.split())
-        funnel_extra = f"approx {word_count} words of GA4 data"
-
-    # Page-tagging coverage matters a lot for downstream agents.
-    pages_extra = ""
-    if _is_present(page_assets):
-        typed = sum(
-            1 for a in page_assets
-            if _is_present(a.get("page_type")) and a.get("page_type") != "other"
-        )
-        pages_extra = f"{len(page_assets)} page(s), {typed} with specific page type"
-
-    session_extra = ""
-    if _is_present(session_insights) and isinstance(session_insights, str):
-        word_count = len(session_insights.split())
-        session_extra = f"approx {word_count} words of behavioural observations"
-
-    context_extra = ""
-    if _is_present(client_context) and isinstance(client_context, str):
-        word_count = len(client_context.split())
-        context_extra = f"approx {word_count} words"
-
-    lines = [
-        "INPUT AVAILABILITY FOR THIS RUN:",
-        status("GA4 funnel data", funnel_summary, funnel_extra),
-        status("Page-type mapping", page_assets, pages_extra),
-        status("Session recording insights (behavioural observations)",
-               session_insights, session_extra),
-        status("Business context", client_context, context_extra),
-    ]
+def _format_page_assets_for_agent1(page_assets: list[dict]) -> str:
+    if not page_assets:
+        return "No page-type tagging provided — analyse all URLs site-wide."
+    lines = ["URL → page type mapping (use these tags in your findings):"]
+    for a in page_assets:
+        pt    = (a.get("page_type") or "other").upper()
+        label = a.get("page_label") or "Untitled"
+        url   = a.get("url") or ""
+        lines.append(f"  • {url}  →  {pt} ({label})")
     return "\n".join(lines)
 
 
 def agent1_prompt(funnel_summary: str, client_context: str,
                   session_insights: str = '',
-                  page_assets: list = None) -> tuple:
-    """
-    Funnel-analyst agent prompt — input-aware revision.
-
-    With GA4 data only, the agent stays close to the numbers and produces
-    quantitative findings. With session insights also present, the agent
-    can reason about user behaviour. It does not pretend to know what users
-    are doing when it only has numbers.
-    """
-    page_assets = page_assets or []
-    page_map = _format_page_assets_for_agent1(page_assets)
+                  page_assets: list[dict] = None) -> tuple[str, str]:
+    page_map = _format_page_assets_for_agent1(page_assets or [])
 
     system = """You are a senior CRO analyst specialising in e-commerce funnel analysis.
-You receive GA4 data and identify where revenue is leaking — pages or steps where drop-off
-is disproportionate to traffic volume.
+You receive GA4 data and identify exactly where revenue is leaking — pages or steps where
+drop-off is disproportionate to traffic volume.
 
-You may also receive behavioural observations from session recordings and a URL-to-page-type
-mapping. The user message will tell you which inputs are PRESENT and which are NOT AVAILABLE
-for this specific run. Adapt your analysis accordingly.
+You also receive a URL-to-page-type mapping. When you reference a page in your output, use
+the page type tag in your finding (e.g. "the PDP at /products/x" not just "/products/x").
+This makes the report easier for the consultant and the next agent to interpret.
 
-ADAPTIVE DEPTH — READ CAREFULLY:
+You write in British English. Every claim must cite a specific number from the data.
+You never produce generic lists of "common CRO issues" — all findings must reference
+the actual data provided.
 
-  When session insights ARE PRESENT:
-    You may reason about user behaviour (rage clicks, hesitation, scroll patterns,
-    form abandonment) because you have evidence for it. Tag the behavioural claim
-    with the specific session observation that supports it.
+CRITICAL: You must respond with a single valid JSON object and nothing else.
+No preamble, no explanation, no markdown code fences. Raw JSON only.
 
-  When session insights are NOT AVAILABLE:
-    Stay close to the numbers. Describe WHAT is happening (sessions, bounce rate,
-    engagement, mobile/desktop split, period change). Do NOT speculate about WHY
-    users behaved that way ("users are frustrated", "the layout caused confusion",
-    "rage clicks likely"). You cannot see those things without session data.
-    Frame hypotheses as "the data pattern suggests X is worth testing" rather than
-    asserting user mental states you cannot evidence.
-
-  When page-type mapping IS PRESENT:
-    Tag every page reference with its page type (PDP, PLP, checkout, etc.).
-    This is critical for downstream agents — Agent 5 groups tests by page type.
-
-  When page-type mapping is NOT AVAILABLE:
-    Tag every page reference as "unknown" and flag in your summary that
-    page-type tagging would significantly improve the analysis. Do not guess
-    page types from URL slugs alone — slug guesses are often wrong.
-
-  When business context is NOT AVAILABLE:
-    Do not infer industry-specific behaviour or seasonality. Stick to what the
-    GA4 data directly shows.
-
-  Schema honesty:
-    It is FAR better to return 2 deeply-evidenced leaks than 3 thinly-evidenced
-    ones. Empty arrays and brief findings are honest signals to the consultant
-    that the available data only supports limited analysis. They are not
-    failures.
-
-You write in British English. Every claim must cite a specific number from the
-provided data. You never produce generic lists of "common CRO issues" — all
-findings must reference the actual numbers given to you.
-
-CRITICAL: Respond with a single valid JSON object and nothing else.
-No preamble, no markdown, no code fences. Raw JSON only.
-
-Schema (fields not supported by the available data should be empty arrays or
-brief honest strings, NOT padded):
+Your JSON must follow this exact structure:
 {
-  "input_audit": {
-    "sources_used": ["List of input types you drew evidence from"],
-    "sources_missing": ["List of input types that were NOT AVAILABLE"],
-    "confidence_note": "One sentence on how the missing sources limit the depth of this analysis"
-  },
   "leak_map": [
     {
       "page": "/path",
@@ -173,24 +58,23 @@ brief honest strings, NOT padded):
       "desktop_sessions": 4000,
       "mobile_bounce_rate": 0.81,
       "desktop_bounce_rate": 0.55,
-      "mobile_desktop_gap": "Quantitative description of the mobile vs desktop gap",
-      "period_change": "Period-over-period change with specific numbers",
+      "mobile_desktop_gap": "mobile bounce rate is 26pp higher than desktop — structural issue likely",
+      "period_change": "sessions down 14.2% vs prior 28 days",
       "finding": "One specific, data-backed sentence describing the leak.",
-      "behavioural_evidence": "Specific session observation supporting any behavioural claim. EMPTY STRING if session insights are NOT AVAILABLE — do not invent.",
-      "hypothesis": "If [change], then [outcome], because [reason grounded in available data]."
+      "hypothesis": "If [change], then [outcome], because [psychological/UX reason]."
     }
   ],
   "device_summary": {
     "overall_mobile_share": 0.65,
-    "mobile_desktop_ratio": "Quantitative description of the mobile/desktop conversion ratio",
-    "primary_device_issue": "One sentence describing the biggest device-related data pattern. Frame as data pattern, not user behaviour, unless session insights support a behavioural claim."
+    "mobile_desktop_ratio": "mobile CR is 1.4%, desktop CR is 5.2% — ratio of 0.27 (critical threshold is 0.70)",
+    "primary_device_issue": "One sentence on the biggest device-related problem."
   },
   "acquisition_insights": [
     {
       "channel": "Organic Search",
       "sessions": 4500,
       "bounce_rate": 0.61,
-      "finding": "One sentence grounded in the numbers."
+      "finding": "One sentence."
     }
   ],
   "funnel_flow": {
@@ -205,52 +89,99 @@ brief honest strings, NOT padded):
       "page_type": "homepage|plp|pdp|cart|checkout|category|other|unknown",
       "hypothesis": "If/Then/Because statement",
       "data_evidence": "Specific numbers that support this hypothesis",
-      "behavioural_evidence": "Specific session observation supporting any behavioural component. EMPTY STRING if session insights are NOT AVAILABLE.",
       "estimated_impact": "high|medium|low"
     }
   ],
-  "summary": "3-4 sentence plain English summary. Use page type tags. Cite specific numbers. If page-type mapping or session insights were missing, note that plainly here so the consultant knows the analysis depth is limited."
+  "summary": "3-4 sentence plain English summary of the biggest findings. Use page type tags. Cite numbers."
 }"""
 
-    availability_block = _build_agent1_availability_block(
-        funnel_summary, session_insights, page_assets, client_context
-    )
-
-    user = f"""Analyse the available data and produce your JSON output.
-
-{availability_block}
+    user = f"""Analyse the following GA4 funnel data and produce your JSON output.
 
 BUSINESS CONTEXT:
-{client_context if _is_present(client_context) else 'NOT AVAILABLE for this run.'}
+{client_context or 'No specific business context provided.'}
 
 {page_map}
 
 GA4 DATA:
-{funnel_summary if _is_present(funnel_summary) else 'NOT AVAILABLE — this is a serious problem; Agent 1 cannot meaningfully analyse a funnel without GA4 data.'}
+{funnel_summary}
 
 SESSION RECORDING INSIGHTS:
-{session_insights if _is_present(session_insights) else 'NOT AVAILABLE for this run. Stay close to the numbers in your analysis. Do not speculate about user behaviour.'}
+{session_insights or 'No session recording data provided.'}
 
-Identify the biggest revenue leaks the data actually supports — typically 2-3, but
-fewer is acceptable if the data is thin. For each leak, provide the mobile vs
-desktop breakdown where the GA4 data shows it.
+Identify the 3 biggest revenue leaks. For each leak, give the mobile vs desktop breakdown
+where the data supports it. The mobile/desktop conversion ratio is the most important signal —
+a ratio below 0.70 (mobile CR / desktop CR) indicates a structural problem.
 
-The mobile/desktop conversion ratio is the most important quantitative signal —
-a ratio below 0.70 (mobile CR / desktop CR) indicates a structural problem worth
-prioritising.
-
-When you reference a URL, tag it with its page type from the mapping above.
+When you reference a URL in any finding, also tag it with its page type from the mapping above.
 If a URL has no mapping, use "unknown" as the page_type.
 
-If session insights are PRESENT, you may make behavioural claims — but tag each
-with the specific observation that supports it in the `behavioural_evidence`
-field. If session insights are NOT AVAILABLE, leave `behavioural_evidence` as
-an empty string and frame your hypotheses as "the data pattern suggests..."
-rather than as assertions about user mental states.
+Focus on pages where drop-off is disproportionate to their traffic share.
+Produce your JSON output now."""
 
-Begin your output with the `input_audit` object so the consultant immediately
-sees what this analysis could and could not cover. Then produce the rest of
-the JSON. Output your JSON now."""
+    return system, user
+
+
+# ── Agent 2: Hypothesis Engineer ──────────────────────────────────────────────
+
+def agent2_prompt(agent1_output: dict, client_context: str,
+                  monthly_traffic: int, dev_hours_per_week: int) -> tuple[str, str]:
+    import json
+
+    system = """You are a CRO prioritisation engine. You receive a funnel leak map and
+score every testable hypothesis using this formula:
+
+  Priority Score = (Impact × Confidence) ÷ Effort
+
+Where:
+  Impact     = 1–5 (based on page traffic share and severity of the leak)
+  Confidence = 1–5 (based on strength of psychological principle and supporting data)
+  Effort     = 1–3 (1 = text/CSS change, 2 = component change, 3 = major rebuild)
+
+You write in British English. Every score must be justified with a specific reason.
+
+CRITICAL: Respond with a single valid JSON object and nothing else.
+No preamble, no markdown, no code fences. Raw JSON only.
+
+Your JSON must follow this exact structure:
+{
+  "ranked_tests": [
+    {
+      "rank": 1,
+      "page": "/path",
+      "page_type": "homepage|plp|pdp|cart|checkout|category|other|unknown",
+      "hypothesis": "If/Then/Because statement",
+      "test_type": "copy|layout|ux|social_proof|urgency|navigation|other",
+      "impact_score": 4,
+      "impact_reason": "This page receives 34% of total sessions and has a 78% mobile bounce rate",
+      "confidence_score": 4,
+      "confidence_reason": "Mobile layout issues causing rage clicks is well-documented in session data",
+      "effort_score": 1,
+      "effort_reason": "CSS reorder of above-fold elements — no dev dependency",
+      "priority_score": 16.0,
+      "expected_metric_change": "Mobile CR +2–4% based on comparable layout fixes",
+      "run_parallel_safe": true
+    }
+  ],
+  "scoring_notes": "One paragraph explaining the prioritisation logic applied.",
+  "quick_wins": ["Top 2-3 tests that are effort=1 and priority_score >= 8"],
+  "summary": "2-3 sentence plain English summary of the ranked roadmap."
+}"""
+
+    user = f"""Score and rank all testable hypotheses from the funnel analysis below.
+
+BUSINESS CONTEXT:
+{client_context or 'No specific business context provided.'}
+
+MONTHLY TRAFFIC: {monthly_traffic or 'unknown'} sessions
+DEV HOURS AVAILABLE: {dev_hours_per_week or 'unknown'} hours/week
+
+FUNNEL ANALYSIS OUTPUT (Agent 1):
+{json.dumps(agent1_output, indent=2, ensure_ascii=True)}
+
+Apply the Priority Score formula to every hypothesis in the leak_map and top_3_hypotheses.
+Carry through the page_type tag from each leak so the test calendar can group by page type.
+Add any additional test ideas you identify from the data that are not already in the hypothesis list.
+Output your ranked JSON now."""
 
     return system, user
 
