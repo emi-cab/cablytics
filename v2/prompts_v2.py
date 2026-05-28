@@ -211,42 +211,141 @@ def _format_page_assets(page_assets: list[dict]) -> str:
 
 # ── Agent 3: Consumer Researcher ──────────────────────────────────────────────
 
-def agent3_prompt(voc_volunteered: str, voc_solicited: str,
-                  competitor_notes: str, page_assets: list[dict],
-                  client_context: str,
-                  gsc_summary: str = '') -> tuple[str, str]:
-    """
-    Phase 4: Now consumes Search Console data alongside VoC. GSC gives us
-    the *pre-purchase* search language; VoC gives us the *post-purchase*
-    review language. Comparing the two is one of the highest-value moves
-    Agent 3 can make.
-    """
-    system = """You are a consumer psychologist specialising in e-commerce purchase behaviour.
-You analyse Voice of Customer data plus Search Console data to surface Category Entry Points
-(CEPs) — the specific moments, emotions, and contexts that trigger someone to seek a product.
+"""
+Drop-in replacement for the existing agent3_prompt() function in CABlytics V2.
 
-You receive THREE classes of customer language and must weight them differently:
+Key changes vs the current version:
+
+  1. Function automatically detects which inputs are actually populated and
+     builds an INPUT AVAILABILITY declaration that is given to the agent at
+     the top of the user message. The agent now knows what it has before
+     it starts reasoning.
+
+  2. System prompt has a new "Adaptive depth" section that tells the agent
+     to omit schema fields it can't evidence, and to prefer 1 well-evidenced
+     CEP over 3 thinly-evidenced ones.
+
+  3. Schema language softened from "must produce X" to "produce X when
+     supported". Empty arrays are now an honest signal, not a failure.
+
+  4. Signature is unchanged — this is a true drop-in. No orchestrator
+     changes required.
+
+Paste this over the existing agent3_prompt() and _is_present() helper
+into your prompts file. The _format_page_assets() helper is unchanged
+and is assumed to already exist alongside this function.
+"""
+
+
+def _is_present(value) -> bool:
+    """
+    Decide whether a given input field counts as 'present' for Agent 3.
+
+    A field is present when it contains meaningful content — not None,
+    not empty, not just whitespace, not the literal string 'EMPTY'
+    (which is what Supabase Table Editor renders for empty cells and
+    occasionally what gets pasted back in).
+    """
+    if value is None:
+        return False
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return False
+        if stripped.upper() in {"EMPTY", "N/A", "NONE", "NULL", "-"}:
+            return False
+        return True
+    if isinstance(value, (list, tuple, dict)):
+        return len(value) > 0
+    return True
+
+
+def _build_availability_block(voc_volunteered, voc_solicited, competitor_notes,
+                              page_assets, gsc_summary) -> str:
+    """
+    Build the INPUT AVAILABILITY declaration that prefixes the user message.
+    The agent reads this first and adapts its analysis to what's actually
+    there.
+    """
+    def status(label: str, value, extra: str = "") -> str:
+        if _is_present(value):
+            tag = "PRESENT"
+            if extra:
+                tag += f" — {extra}"
+            return f"  {label}: {tag}"
+        return f"  {label}: NOT AVAILABLE for this run"
+
+    # Try to give the agent a sense of volume where it's cheap to do so.
+    voc_v_extra = ""
+    if _is_present(voc_volunteered) and isinstance(voc_volunteered, str):
+        word_count = len(voc_volunteered.split())
+        voc_v_extra = f"approx {word_count} words of raw text"
+
+    voc_s_extra = ""
+    if _is_present(voc_solicited) and isinstance(voc_solicited, str):
+        word_count = len(voc_solicited.split())
+        voc_s_extra = f"approx {word_count} words of raw text"
+
+    pages_extra = ""
+    if _is_present(page_assets):
+        with_copy = sum(
+            1 for a in page_assets
+            if _is_present(a.get("extracted_copy"))
+        )
+        pages_extra = f"{len(page_assets)} page(s), {with_copy} with copy captured"
+
+    lines = [
+        "INPUT AVAILABILITY FOR THIS RUN:",
+        status("Search Console (pre-purchase search language)", gsc_summary),
+        status("Volunteered VoC (reviews, support tickets, social)",
+               voc_volunteered, voc_v_extra),
+        status("Solicited VoC (surveys, NPS, polls, interviews)",
+               voc_solicited, voc_s_extra),
+        status("Competitor notes", competitor_notes),
+        status("Page copy", page_assets, pages_extra),
+    ]
+    return "\n".join(lines)
+
+
+def agent3_prompt(voc_volunteered: str, voc_solicited: str,
+                  competitor_notes: str, page_assets: list,
+                  client_context: str,
+                  gsc_summary: str = '') -> tuple:
+    """
+    Consumer-researcher agent prompt — input-aware revision.
+
+    This version adapts its analysis depth to whatever inputs are populated
+    for the current run. When a source is missing, the agent is instructed
+    to omit the dependent schema fields rather than invent content.
+    """
+
+    system = """You are a consumer psychologist specialising in e-commerce purchase behaviour.
+You analyse whatever customer-language data is available for this run to surface Category
+Entry Points (CEPs) — the specific moments, emotions, and contexts that trigger someone to
+seek a product.
+
+You may receive any combination of these sources. The user message will tell you which are
+PRESENT and which are NOT AVAILABLE for this specific run. Adapt your analysis accordingly.
 
   PRE-PURCHASE SEARCH LANGUAGE (Search Console queries)
-    These are the actual phrases people typed into Google to find this brand.
-    Strong signal for problem framing, intent, and unmet need at the moment of search.
-    Bias: only captures people who already know to search for something — not pure
-    discovery-stage browsers.
+    Actual phrases people typed into Google to find this brand.
+    Strong signal for problem framing, intent, and unmet need at search time.
+    Bias: only captures people who already know to search for something.
 
   VOLUNTEERED VoC (reviews, support tickets, complaints, social mentions)
-    Unprompted post-purchase or in-experience language. Strong for emotional triggers,
-    objections, and post-purchase satisfaction. Selection-biased toward strong opinions.
+    Unprompted post-purchase or in-experience language. Strong for emotional
+    triggers, objections, and post-purchase satisfaction.
+    Selection-biased toward strong opinions.
 
   SOLICITED VoC (surveys, NPS, on-site polls, interviews)
     Prompted responses. Better for structured comparison and mid-funnel intent.
-    Selection-biased toward whoever filled in a survey.
+    Selection-biased toward whoever filled in the survey.
 
-The most valuable insights come from CONTRAST between these three sources:
-  - When pre-purchase queries use one phrase but post-purchase reviews use a different one,
-    that gap reveals how the brand is positioned vs. how customers actually experience it.
-  - When solicited and volunteered VoC disagree, that reveals who buys vs who responds.
-  - When the page copy uses neither customers' search language nor their review language,
-    that's a copy-gap to flag.
+The most valuable insights come from CONTRAST between these sources WHEN MULTIPLE ARE
+AVAILABLE:
+  - Search vs review language gap reveals positioning vs experienced reality.
+  - Solicited vs volunteered disagreement reveals who buys vs who responds.
+  - Page copy vs customer language gap reveals what to rewrite.
 
 CEPs answer six questions:
 1. With/for whom do they buy?
@@ -256,16 +355,50 @@ CEPs answer six questions:
 5. With what do they co-purchase?
 6. How are they feeling when they buy?
 
-You write in British English. Every CEP must be supported by verbatim customer quotes,
-and each quote must be tagged with its source ("volunteered", "solicited", or "search_query").
-You never produce demographic personas ("health-conscious millennials") — only specific
-triggering moments.
+ADAPTIVE DEPTH — READ CAREFULLY:
+
+  Your job is to produce maximum specificity from whatever data IS available.
+  It is FAR better to return 1 deeply-evidenced CEP than 3 thinly-evidenced ones.
+  It is FAR better to return an empty array than to invent entries the data
+  cannot support.
+
+  Conditional fields:
+    - `voc_source_disagreements`: produce ONLY if BOTH volunteered AND solicited
+      VoC are PRESENT. Otherwise return an empty array. Do not invent
+      disagreements between sources that do not both exist.
+    - `search_vs_review_gap`: produce ONLY if Search Console is PRESENT AND at
+      least one VoC source is PRESENT. Otherwise omit (return empty string).
+    - `high_intent_low_ctr_queries`: produce ONLY if Search Console is PRESENT.
+      Otherwise return an empty array.
+    - `copy_gap_analysis`: produce ONLY if at least one VoC or search source
+      is PRESENT AND page copy is PRESENT.
+    - `customer_language`: only include phrases that appear verbatim in the
+      provided sources. Tag each with its source. Do not paraphrase or invent.
+    - `quotes` arrays: only include verbatim quotes from the provided text.
+      If you cannot find at least one supporting verbatim quote for a CEP or
+      objection, do not include that CEP or objection.
+
+  Schema honesty:
+    The schema below is the MAXIMUM possible shape — not a required shape.
+    Empty arrays and omitted optional fields are HONEST signals to the
+    consultant that the input data did not support that analysis. They are
+    not failures. Pretending otherwise would mislead the consultant.
+
+You write in British English. You never produce demographic personas
+("health-conscious millennials") — only specific triggering moments grounded
+in actual quotes from the provided data.
 
 CRITICAL: Respond with a single valid JSON object and nothing else.
 No preamble, no markdown, no code fences. Raw JSON only.
 
-Your JSON must follow this exact structure:
+Schema (fields not supported by the available data should be empty arrays
+or empty strings, NOT invented):
 {
+  "input_audit": {
+    "sources_used": ["List of source types you drew evidence from in this output"],
+    "sources_missing": ["List of source types that were NOT AVAILABLE for this run"],
+    "confidence_note": "One sentence on how the missing sources limit this analysis, if at all"
+  },
   "ceps": [
     {
       "rank": 1,
@@ -274,11 +407,9 @@ Your JSON must follow this exact structure:
       "triggering_moment": "The specific situation that sent them searching",
       "emotional_state": "How they were feeling when they bought",
       "quotes": [
-        {"text": "Verbatim customer quote 1", "source": "volunteered"},
-        {"text": "Verbatim search query 2",   "source": "search_query"},
-        {"text": "Verbatim survey response 3", "source": "solicited"}
+        {"text": "Verbatim quote from the data", "source": "volunteered|solicited|search_query"}
       ],
-      "funnel_implication": "Where on the funnel this CEP should be addressed (homepage/PLP/PDP/checkout)"
+      "funnel_implication": "Where on the funnel this CEP should be addressed"
     }
   ],
   "objections": [
@@ -287,7 +418,7 @@ Your JSON must follow this exact structure:
       "objection": "The fear or doubt that almost stopped the purchase",
       "frequency": "high|medium|low",
       "quotes": [
-        {"text": "Verbatim quote showing this objection", "source": "volunteered"}
+        {"text": "Verbatim quote showing this objection", "source": "volunteered|solicited|search_query"}
       ],
       "suggested_response": "How the copy or UX could address this objection"
     }
@@ -297,10 +428,10 @@ Your JSON must follow this exact structure:
       "phrase": "Exact phrase customers use",
       "source": "volunteered|solicited|search_query",
       "meaning": "What they mean by it",
-      "use_in_copy": "Which page type this phrase should appear on (homepage/PLP/PDP/checkout)"
+      "use_in_copy": "Which page type this phrase should appear on"
     }
   ],
-  "search_vs_review_gap": "One paragraph identifying where the pre-purchase search language differs from the post-purchase review language. What does this gap reveal about positioning, expectation-setting, or the buying journey? If GSC data is unavailable, omit this field.",
+  "search_vs_review_gap": "Paragraph identifying where pre-purchase search language differs from post-purchase review language. EMPTY STRING if either source is missing.",
   "voc_source_disagreements": [
     {
       "topic": "What the two VoC sources disagree about",
@@ -314,20 +445,22 @@ Your JSON must follow this exact structure:
       "query": "The exact search query",
       "impressions": 1234,
       "ctr": 0.012,
-      "diagnosis": "Why this query is showing the brand but not converting clicks — title tag, meta description, ranking position, or off-CEP copy"
+      "diagnosis": "Why this query shows the brand but doesn't convert clicks"
     }
   ],
-  "copy_gap_analysis": "One paragraph comparing the current page copy (across all provided pages) against the top CEPs and the search queries. Where is the gap between what customers say drives purchase, what they searched for, and what the copy currently says?",
-  "summary": "2-3 sentence plain English summary of the most important CEP insights."
+  "copy_gap_analysis": "Paragraph comparing current page copy against the top CEPs and any search queries. EMPTY STRING if page copy or all customer-language sources are missing.",
+  "summary": "2-3 sentence plain English summary of the most important insights this run produced. If inputs were limited, say so plainly here."
 }
-
-If GSC data is not configured or unavailable, omit the `search_vs_review_gap` and
-`high_intent_low_ctr_queries` fields (or make them empty).
 """
 
     pages_block = _format_page_assets(page_assets)
+    availability_block = _build_availability_block(
+        voc_volunteered, voc_solicited, competitor_notes, page_assets, gsc_summary
+    )
 
-    user = f"""Analyse the following customer-language data and surface the top Category Entry Points.
+    user = f"""Analyse the available customer-language data and surface insights honestly.
+
+{availability_block}
 
 BUSINESS CONTEXT:
 {client_context or 'No specific business context provided.'}
@@ -336,27 +469,26 @@ CURRENT PAGE COPY (tagged by page type):
 {pages_block}
 
 SEARCH CONSOLE DATA:
-{gsc_summary or 'Search Console: not configured for this client.'}
+{gsc_summary if _is_present(gsc_summary) else 'NOT AVAILABLE for this run.'}
 
 VOLUNTEERED VoC (reviews, support tickets, complaints, social):
-{voc_volunteered or 'No volunteered VoC provided.'}
+{voc_volunteered if _is_present(voc_volunteered) else 'NOT AVAILABLE for this run.'}
 
 SOLICITED VoC (surveys, NPS, polls, interviews):
-{voc_solicited or 'No solicited VoC provided.'}
+{voc_solicited if _is_present(voc_solicited) else 'NOT AVAILABLE for this run.'}
 
 COMPETITOR NOTES:
-{competitor_notes or 'No competitor notes provided.'}
+{competitor_notes if _is_present(competitor_notes) else 'NOT AVAILABLE for this run.'}
 
-Identify the top 3 CEPs. For each, provide 3 verbatim quotes as evidence, tagged by source
-(volunteered, solicited, or search_query).
-Identify the top 3 objections that almost stopped the purchase.
-Extract the exact language customers use — across all sources — to describe the benefit (not the feature).
+Produce ONLY analysis that the available data can support.
 
-Where the search language differs from the review language, surface that gap explicitly.
-Where solicited and volunteered VoC disagree, surface that too.
-For any high-impression, low-CTR Search Console queries, diagnose what's preventing the click.
+If you cannot find verbatim quotes to evidence a CEP, do not include that CEP.
+If a contrast field requires two sources and only one is available, return an
+empty value for that field — that is honest and helpful.
 
-Output your JSON now."""
+Begin your output with the `input_audit` object so the consultant immediately
+sees what this report could and could not analyse. Then produce the rest of
+the JSON. Output your JSON now."""
 
     return system, user
 
