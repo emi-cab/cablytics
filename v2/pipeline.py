@@ -122,7 +122,8 @@ def _enrich_ad_creatives_with_urls(ad_creatives: list[dict]) -> list[dict]:
 # ── Individual agent runners ───────────────────────────────────────────────────
 
 def run_agent1(client_data: dict, report_id: int,
-               manual_upload: dict | None = None) -> dict:
+               manual_upload: dict | None = None,
+               provisional_transition: dict | None = None) -> dict:
     """
     Funnel Analyst — pulls GA4 data and identifies revenue leaks.
 
@@ -154,7 +155,7 @@ def run_agent1(client_data: dict, report_id: int,
 
     log_event(client_id, "agent_started", report_id=report_id, agent_number=1, message="Calling Claude API")
 
-    system, user = agent1_prompt(funnel_summary, context, session_insights, page_assets)
+    system, user = agent1_prompt(funnel_summary, context, session_insights, page_assets, provisional_transition)
     output = _call_claude(system, user, agent_num=1)
 
     update_report_agent(report_id, 1, output)
@@ -283,7 +284,8 @@ def run_agent5(agent2_output: dict, client_data: dict, report_id: int) -> dict:
 # ── Main pipeline orchestrator ─────────────────────────────────────────────────
 
 def run_pipeline(client_slug: str, triggered_by: str = "manual",
-                 manual_upload_id: int | None = None):
+                 manual_upload_id: int | None = None,
+                 provisional_transition: dict | None = None):
     """
     Run the full 5-agent pipeline for a client.
 
@@ -345,7 +347,9 @@ def run_pipeline(client_slug: str, triggered_by: str = "manual",
         def _run1():
             try:
                 agent1_result.update(
-                    run_agent1(client_data, report_id, manual_upload=manual_upload)
+                    run_agent1(client_data, report_id,
+                               manual_upload=manual_upload,
+                               provisional_transition=provisional_transition)
                 )
             except Exception as e:
                 agent1_error.append(str(e))
