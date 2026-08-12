@@ -1009,3 +1009,72 @@ Flag any test unlikely to reach significance within 28 days given the traffic vo
 Output your JSON now."""
 
     return system, user
+
+# ── Intent Parser (for /v2/console) ────────────────────────────────────────────
+
+def intent_parser_prompt(query: str, known_clients: list[dict]) -> tuple[str, str]:
+    """
+    Parse an operator's natural-language request into a structured run spec.
+    known_clients: list of {client_slug, client_name} so the parser can
+    resolve which client a query refers to without guessing.
+    """
+    import json
+
+    client_lines = "\n".join(
+        f"  - {c.get('client_name')} (slug: {c.get('client_slug')})"
+        for c in known_clients
+    ) or "  (no clients configured)"
+
+    system = """You are the intent parser for CABlytics, a GA4 CRO analytics pipeline.
+Convert an operator's natural-language request into a structured run specification.
+
+CRITICAL: Respond with a single valid JSON object and nothing else.
+No preamble, no markdown, no code fences. Raw JSON only.
+
+DEMAND SURFACE (fixed vocabulary, in order):
+  latent → emerging → active → decision → owned
+A conversion LEAK is a failed TRANSITION between two adjacent states, written
+"<from>_to_<to>" (e.g. "active_to_decision").
+
+For provisional_transition: propose the transition the request is MOST about,
+based on the URL's likely funnel role and the wording. This is a HYPOTHESIS
+proposed from the URL alone before any data is seen — Agent 1 will confirm or
+correct it against real funnel data. Never assert it as certain.
+  - product / pricing / comparison pages → usually active_to_decision
+  - cart / checkout / payment steps → usually decision_to_owned
+  - landing / blog / category pages → usually emerging_to_active
+If you genuinely cannot tell, set transition to null.
+
+CLIENT RESOLUTION IS SAFETY-CRITICAL: only set "client_slug" when the query
+clearly implies one specific client (names it, or names a URL/domain uniquely
+theirs). If ambiguous, set client_slug to null and add a clarifying question
+to "clarify". Never guess a client — a wrong guess fires GA4 quota and API
+spend against the wrong property.
+
+OUTPUT SHAPE:
+{
+  "intent": "traffic_leak | funnel_analysis | full_report | comparison",
+  "client_slug": "<slug from the provided list, or null>",
+  "urls": ["<path or full url>", ...],
+  "date_range": {"start": "<YYYY-MM-DD or relative e.g. 'last_90_days'>", "end": "<... or 'today'>"},
+  "comparison_period": "<e.g. 'same_period_last_year' | null>",
+  "provisional_transition": {
+    "transition": "<e.g. active_to_decision | null>",
+    "reasoning": "<one sentence: why this transition, from URL role + wording>"
+  },
+  "clarify": ["<question>", ...]
+}
+The "clarify" array is empty when nothing is ambiguous."""
+
+    user = f"""Parse this request into the JSON run specification.
+
+KNOWN CLIENTS:
+{client_lines}
+
+REQUEST:
+{query}
+
+Resolve the client only if unambiguous. Propose a provisional demand-state
+transition from the URL's role. Output your JSON now."""
+
+    return system, user
