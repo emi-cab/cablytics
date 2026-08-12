@@ -72,7 +72,8 @@ def _build_agent1_availability_block(funnel_summary, session_insights,
 
 def agent1_prompt(funnel_summary: str, client_context: str,
                   session_insights: str = '',
-                  page_assets: list[dict] = None) -> tuple[str, str]:
+                  page_assets: list[dict] = None,
+                  provisional_transition: dict = None) -> tuple[str, str]:
     """
     Funnel-analyst agent prompt — input-aware revision.
 
@@ -120,6 +121,31 @@ ADAPTIVE DEPTH — READ CAREFULLY:
     Do not infer industry-specific behaviour or seasonality. Stick to what the
     GA4 data directly shows.
 
+    DEMAND SURFACE MAPPING:
+    Every leak is a failure to move a visitor forward through five demand
+    states (CAB's Demand Surface model):
+      latent    → not yet aware they have a need
+      emerging  → a need has appeared; starting to look
+      active    → comparing options, researching
+      decision  → narrowing down who to choose
+      owned     → converted / already a customer
+    A leak is always a failed TRANSITION between two ADJACENT states, written
+    "<from>_to_<to>" (e.g. "active_to_decision"). Map each leak to the
+    transition its drop-off number evidences:
+      - A product/pricing/comparison page bleeding engaged sessions is usually
+        active_to_decision (they researched, then didn't commit).
+      - A cart/checkout/payment step bleeding sessions is usually
+        decision_to_owned (they chose, then didn't complete).
+      - A landing/blog/category page with high bounce off cold traffic is
+        usually emerging_to_active (they looked, then left without engaging).
+    You may be given a PROVISIONAL transition proposed upstream from the URL
+    alone, before any data was seen. Treat it as a hypothesis to TEST, not a
+    fact. Confirm it if your drop-off numbers support it; CORRECT it if the
+    data points to a different transition; and say which you did. The number
+    decides, not the URL. If the funnel data is too thin to evidence any
+    transition for a given leak, set demand_state.transition to "unknown"
+    rather than guessing.
+
   Schema honesty:
     It is FAR better to return 2 deeply-evidenced leaks than 3 thinly-evidenced
     ones. Empty arrays and brief findings are honest signals to the consultant
@@ -145,6 +171,12 @@ brief honest strings, NOT padded):
     {
       "page": "/path",
       "page_type": "homepage|plp|pdp|cart|checkout|category|other|unknown",
+      "demand_state": {
+        "transition": "latent_to_emerging|emerging_to_active|active_to_decision|decision_to_owned|unknown",
+        "provisional_was": "The upstream-proposed transition, or empty string if none was given",
+        "verdict": "confirmed|corrected|unavailable",
+        "evidence": "The specific drop-off number that justifies this transition, e.g. '47% of engaged sessions exit /pricing without reaching checkout'"
+      },
       "severity": "high|medium|low",
       "sessions": 12345,
       "bounce_rate": 0.72,
@@ -195,6 +227,22 @@ brief honest strings, NOT padded):
     availability_block = _build_agent1_availability_block(
         funnel_summary, session_insights, page_assets, client_context
     )
+    if provisional_transition and _is_present(provisional_transition.get("transition")):
+        proposed = provisional_transition["transition"]
+        proposed_reason = provisional_transition.get("reasoning", "")
+        transition_block = (
+            "PROVISIONAL DEMAND-STATE TRANSITION (proposed upstream from the URL "
+            "alone, before any data was seen — treat as a hypothesis to test):\n"
+            f"  Proposed: {proposed}\n"
+            f"  Upstream reasoning: {proposed_reason}\n"
+            "  Confirm this against your drop-off numbers, or correct it. "
+            "The data decides."
+        )
+    else:
+        transition_block = (
+            "PROVISIONAL DEMAND-STATE TRANSITION: none provided (e.g. scheduled "
+            "run). Map each leak to its transition from the drop-off data directly."
+        )
 
     user = f"""Analyse the available data and produce your JSON output.
 
@@ -204,6 +252,8 @@ BUSINESS CONTEXT:
 {client_context if _is_present(client_context) else 'NOT AVAILABLE for this run.'}
 
 {page_map}
+
+{transition_block}
 
 GA4 DATA:
 {funnel_summary if _is_present(funnel_summary) else 'NOT AVAILABLE — this is a serious problem; Agent 1 cannot meaningfully analyse a funnel without GA4 data.'}
@@ -221,6 +271,11 @@ prioritising.
 
 When you reference a URL, tag it with its page type from the mapping above.
 If a URL has no mapping, use "unknown" as the page_type.
+For each leak, populate the demand_state object: map the leak to the demand
+transition its drop-off evidences, state whether you confirmed or corrected any
+provisional transition given above, and cite the specific number that justifies
+it. If the data cannot evidence a transition, set it to "unknown" with verdict
+"unavailable" — do not guess.
 
 If session insights are PRESENT, you may make behavioural claims — but tag each
 with the specific observation that supports it in the `behavioural_evidence`
