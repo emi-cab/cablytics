@@ -72,7 +72,7 @@ def _call_claude(system: str, user, agent_num: int) -> dict:
 
     message = client.messages.create(
         model="claude-sonnet-4-6",
-        max_tokens=4000,
+        max_tokens=8000,
         system=system,
         messages=[{"role": "user", "content": message_content}]
     )
