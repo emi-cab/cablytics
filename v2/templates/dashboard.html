@@ -313,6 +313,19 @@
     .badge-medium { background: rgba(240,255,42,0.4);  color: var(--brand-yellow-dark); border: 1px solid rgba(240,255,42,0.7); }
     .badge-low    { background: rgba(157,242,4,0.2);   color: var(--brand-green-dark);  border: 1px solid rgba(157,242,4,0.5); }
     .badge-blue   { background: rgba(102,226,227,0.25); color: var(--accent);            border: 1px solid rgba(102,226,227,0.5); }
+    /* ── Demand-state transition pill ── */
+    .badge-demand {
+      background: rgba(6,96,96,0.08);
+      color: var(--accent);
+      border: 1px solid rgba(6,96,96,0.25);
+      letter-spacing: 0.05em;
+    }
+    .badge-demand .demand-verdict {
+      opacity: 0.6;
+      font-weight: 400;
+      text-transform: none;
+      letter-spacing: 0.02em;
+    }
 
     /* ── Leak map ── */
     .leak-item {
@@ -791,6 +804,15 @@
             <span class="badge badge-{{ leak.get('severity', 'low') }}">{{ leak.get('severity', '—') }}</span>
             {% if leak.get('sessions') %}
               <span class="badge badge-blue">{{ '{:,}'.format(leak.sessions) }} sessions</span>
+            {% endif %}
+            {% set ds = leak.get('demand_state') %}
+            {% if ds and ds.get('transition') and ds.get('transition') != 'unknown' %}
+              <span class="badge badge-demand" title="{{ ds.get('evidence', '') }}">
+                {{ ds.transition.replace('_to_', ' → ').replace('_', ' ') }}
+                {% if ds.get('verdict') and ds.get('verdict') != 'unavailable' %}
+                  <span class="demand-verdict">· {{ ds.verdict }}</span>
+                {% endif %}
+              </span>
             {% endif %}
           </div>
           {% if leak.get('finding') %}
