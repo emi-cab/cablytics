@@ -909,40 +909,34 @@ def manual_upload_run(slug, upload_id):
         "message": "Pipeline started. Redirecting to the client dashboard…",
         "next": f"/v2/dashboard/{slug}",
     })
-
 # ============================================================
 # TEMPORARY — verifies the intent parser. Remove after verification.
 # Hit: /v2/_test_intent?q=analyse traffic leak on /able/ablepro last 90 days vs same period last year
 # ============================================================
-@v2.route('/_test_intent', methods=['GET'])
+@v2.route("/_test_intent", methods=["GET"])
 def _test_intent():
-    from flask import request
     from v2.prompts_v2 import intent_parser_prompt
     from v2.pipeline import _call_claude
-    from v2.db import get_connection, DATABASE_URL
 
-    query = request.args.get('q', '').strip()
+    query = (request.args.get("q") or "").strip()
     if not query:
-        return {'error': 'Pass a query as ?q=...'}, 400
+        return jsonify({"error": "Pass a query as ?q=..."}), 400
 
-    # Pull known clients so the parser can resolve the client safely.
     try:
-        with get_connection() as conn:
-            if DATABASE_URL:
-                with conn.cursor() as cur:
-                    cur.execute("SELECT client_slug, client_name FROM clients")
-                    rows = cur.fetchall()
-            else:
-                rows = conn.execute("SELECT client_slug, client_name FROM clients").fetchall()
-        known_clients = [{'client_slug': r[0], 'client_name': r[1]} for r in rows]
+        known_clients = [
+            {"client_slug": c["client_slug"], "client_name": c["client_name"]}
+            for c in list_clients()
+        ]
     except Exception as e:
-        return {'error': f'DB error fetching clients: {e}', 'type': type(e).__name__}, 500
+        return jsonify({"error": f"DB error fetching clients: {e}",
+                        "type": type(e).__name__}), 500
 
     system, user = intent_parser_prompt(query, known_clients)
 
     try:
         parsed = _call_claude(system, user, agent_num=0)   # already returns a dict
     except Exception as e:
-        return {'error': f'Parser call failed: {e}', 'type': type(e).__name__}, 500
+        return jsonify({"error": f"Parser call failed: {e}",
+                        "type": type(e).__name__}), 500
 
-    return {'query': query, 'known_clients': known_clients, 'parsed': parsed}
+    return jsonify({"query": query, "known_clients": known_clients, "parsed": parsed})
