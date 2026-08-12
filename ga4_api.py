@@ -973,7 +973,7 @@ RULES:
 - If data is insufficient or anomalous, say so honestly."""
 
         message = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-sonnet-4-6",
             max_tokens=8000,
             messages=[{"role": "user", "content": user_prompt}],
             system=system_prompt
