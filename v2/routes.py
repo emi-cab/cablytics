@@ -940,3 +940,96 @@ def _test_intent():
                         "type": type(e).__name__}), 500
 
     return jsonify({"query": query, "known_clients": known_clients, "parsed": parsed})
+
+# ── Conversational console (parse → confirm → run) ──────────────────────────────
+
+@v2.route("/console")
+def console():
+    """The conversational console page."""
+    return render_template("console.html", clients=list_clients())
+
+
+@v2.route("/console/parse", methods=["POST"])
+def console_parse():
+    """
+    Parse a natural-language query into a run spec. Does NOT run the pipeline —
+    returns the parsed spec for the operator to confirm first.
+    """
+    from v2.prompts_v2 import intent_parser_prompt
+    from v2.pipeline import _call_claude
+
+    data = request.get_json(silent=True) or {}
+    query = (data.get("query") or "").strip()
+    if not query:
+        return jsonify({"error": "query is required"}), 400
+
+    known_clients = [
+        {"client_slug": c["client_slug"], "client_name": c["client_name"]}
+        for c in list_clients()
+    ]
+
+    system, user = intent_parser_prompt(query, known_clients)
+    try:
+        parsed = _call_claude(system, user, agent_num=0)
+    except Exception as e:
+        return jsonify({"error": f"Could not parse that request: {e}"}), 502
+
+    # Resolve the parsed client_slug to a real client name for the confirm UI.
+    resolved = None
+    if parsed.get("client_slug"):
+        c = get_client_by_slug(parsed["client_slug"])
+        if c:
+            resolved = {"client_slug": c["client_slug"], "client_name": c["client_name"]}
+        else:
+            # Parser proposed a slug that doesn't exist — surface it, don't run.
+            parsed.setdefault("clarify", []).append(
+                f"Parser proposed client '{parsed['client_slug']}' which doesn't exist. "
+                f"Please pick the client."
+            )
+            parsed["client_slug"] = None
+
+    return jsonify({"query": query, "parsed": parsed, "resolved_client": resolved})
+
+
+@v2.route("/console/run", methods=["POST"])
+def console_run():
+    """
+    Fire the full pipeline from a confirmed run spec. Expects the parsed spec
+    back from the client (after the operator confirmed it), specifically:
+      client_slug (required), provisional_transition (optional).
+    """
+    data = request.get_json(silent=True) or {}
+    slug = (data.get("client_slug") or "").strip()
+    if not slug:
+        return jsonify({"error": "client_slug is required — confirm the client first"}), 400
+
+    client = get_client_by_slug(slug)
+    if not client:
+        return jsonify({"error": f"Client '{slug}' not found"}), 404
+
+    if get_active_report(client["id"]):
+        return jsonify({
+            "error": "A report is already running for this client. "
+                     "Wait for it to finish before starting another."
+        }), 409
+
+    provisional = data.get("provisional_transition") or None
+
+    def _run():
+        try:
+            run_pipeline(
+                client_slug=slug,
+                triggered_by="console",
+                provisional_transition=provisional,
+            )
+        except Exception as e:
+            print(f"[V2][Pipeline] Console run crashed for {slug}: {e}", flush=True)
+
+    threading.Thread(target=_run, daemon=True).start()
+
+    return jsonify({
+        "ok": True,
+        "client_slug": slug,
+        "message": "Pipeline started.",
+        "next": f"/v2/dashboard/{slug}",
+    })
