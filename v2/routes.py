@@ -1100,25 +1100,3 @@ def report_download(slug):
     download_name = f"CABlytics — {client.get('client_name', slug)}.docx"
     return send_file(out_path, as_attachment=True, download_name=download_name,
                      mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
-
-@v2.route("/report/<slug>/_debug_a5")
-def _debug_a5(slug):
-    import json
-    from flask import jsonify
-    report = get_latest_report(slug)
-    if not report or not report.get("full_report_json"):
-        return jsonify({"error": "no report"})
-    full = json.loads(report["full_report_json"])
-    agents = full.get("agents", {})
-    a5 = agents.get("5", {})
-    cal = a5.get("calendar")
-    return jsonify({
-        "calendar_type": type(cal).__name__,
-        "calendar_keys": list(cal.keys()) if isinstance(cal, dict) else "(is a list)",
-        "calendar_len": len(cal) if isinstance(cal, list) else None,
-        "first_item_keys": (
-            list(cal[0].keys()) if isinstance(cal, list) and cal and isinstance(cal[0], dict)
-            else list(cal["weeks"][0].keys()) if isinstance(cal, dict) and cal.get("weeks")
-            else None
-        ),
-    })
