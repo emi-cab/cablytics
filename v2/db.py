@@ -626,6 +626,30 @@ def get_latest_report(client_slug: str) -> dict | None:
                 ORDER BY r.completed_at DESC LIMIT 1
             """, (client_slug,))
 
+def get_most_recent_run(client_slug: str) -> dict | None:
+    """
+    The newest run for a client REGARDLESS of status (complete, failed,
+    running, pending). Unlike get_latest_report, this does not filter to
+    'complete' — it's used to surface a failed most-recent run on the
+    dashboard instead of silently showing the last good report.
+    """
+    with get_connection() as conn:
+        if DATABASE_URL:
+            with conn.cursor() as cur:
+                return _row(cur, """
+                    SELECT r.* FROM reports r
+                    JOIN clients c ON c.id = r.client_id
+                    WHERE c.client_slug = %s
+                    ORDER BY COALESCE(r.completed_at, r.started_at) DESC LIMIT 1
+                """, (client_slug,))
+        else:
+            return _row(conn, """
+                SELECT r.* FROM reports r
+                JOIN clients c ON c.id = r.client_id
+                WHERE c.client_slug = ?
+                ORDER BY COALESCE(r.completed_at, r.started_at) DESC LIMIT 1
+            """, (client_slug,))
+            
 
 def get_active_report(client_id: int) -> dict | None:
     with get_connection() as conn:
