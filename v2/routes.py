@@ -1111,13 +1111,14 @@ def _debug_a5(slug):
     full = json.loads(report["full_report_json"])
     agents = full.get("agents", {})
     a5 = agents.get("5", {})
+    cal = a5.get("calendar")
     return jsonify({
-        "agents_keys": list(agents.keys()),
-        "a5_type": type(a5).__name__,
-        "a5_top_keys": list(a5.keys()) if isinstance(a5, dict) else "(not a dict)",
-        "has_weeks": isinstance(a5, dict) and "weeks" in a5,
-        "weeks_len": len(a5["weeks"]) if isinstance(a5, dict) and isinstance(a5.get("weeks"), list) else None,
-        "first_week_keys": (list(a5["weeks"][0].keys())
-                            if isinstance(a5, dict) and a5.get("weeks") and isinstance(a5["weeks"][0], dict)
-                            else None),
+        "calendar_type": type(cal).__name__,
+        "calendar_keys": list(cal.keys()) if isinstance(cal, dict) else "(is a list)",
+        "calendar_len": len(cal) if isinstance(cal, list) else None,
+        "first_item_keys": (
+            list(cal[0].keys()) if isinstance(cal, list) and cal and isinstance(cal[0], dict)
+            else list(cal["weeks"][0].keys()) if isinstance(cal, dict) and cal.get("weeks")
+            else None
+        ),
     })
