@@ -48,7 +48,7 @@ def _base_layout(**overrides) -> dict:
         plot_bgcolor="rgba(0,0,0,0)",
         margin=dict(l=8, r=8, t=8, b=8),
         showlegend=False,
-        hoverlabel=dict(font=dict(family=FONT_MONO, size=12), bgcolor=INK, bordercolor=INK),
+        hoverlabel=dict(font=dict(family=FONT_MONO, size=12, color="#ffffff"), bgcolor=INK, bordercolor=INK),
         xaxis=dict(gridcolor=BORDER, zerolinecolor=BORDER,
                    tickfont=dict(family=FONT_MONO, size=11, color=INK_3), linecolor=BORDER),
         yaxis=dict(gridcolor=BORDER, zerolinecolor=BORDER,
@@ -201,12 +201,50 @@ def priority_chart(ranked_tests: list, include_js: bool = False) -> str | None:
     rows.sort(key=lambda t: t.get("priority_score") or 0)
 
     def short(t):
+        """
+        Derive a clean short test NAME from the hypothesis. Agent 2 has no
+        dedicated short-name field (a future prompt addition), so we extract
+        the proposed CHANGE: take the clause after the page reference, cut at
+        the first natural boundary word, and cap length. Full hypothesis is in
+        the table below the chart.
+        """
         rank = t.get("rank", "")
-        h = (t.get("hypothesis") or t.get("test_type") or "Test").strip()
-        h = h.split(" then ")[0].replace("If ", "").strip()
-        if len(h) > 60:
-            h = h[:57].rstrip() + "…"
-        return f"{rank}. {h}" if rank else h
+        h = (t.get("hypothesis") or "").strip()
+        ttype = (t.get("test_type") or "").strip()
+
+        clause = h.split(" then ")[0].replace("If ", "").strip()
+
+        # strip page-reference boilerplate so the proposed change leads
+        for boiler in [
+            "the ablePro [other] page ", "the ablePro page ", "ablePro page ",
+            "the page headline and hero copy are ", "the page ", "page ",
+        ]:
+            if clause.lower().startswith(boiler.lower()):
+                clause = clause[len(boiler):].strip()
+                break
+
+        # normalise leading verbs to a noun-ish phrase
+        for verb in ["adds ", "add ", "displays ", "display ", "is ", "are ",
+                     "replaces or supplements ", "audited for "]:
+            if clause.lower().startswith(verb):
+                clause = clause[len(verb):].strip()
+                break
+
+        # cut at the first natural boundary so we do not end mid-phrase
+        for boundary in [" that ", " which ", " visible ", " in a ", " reachable ",
+                         " for cold ", " with a ", " (", " covering ", " \u2014 "]:
+            idx = clause.find(boundary)
+            if idx > 0:
+                clause = clause[:idx].strip()
+                break
+
+        name = clause.rstrip(" ,.;:")
+        if len(name) > 40:
+            name = name[:38].rstrip() + "\u2026"
+        if not name:
+            name = ttype.title() or "Test"
+        name = name[0].upper() + name[1:]
+        return f"{rank}. {name}" if rank else name
 
     labels  = [short(t) for t in rows]
     scores  = [t.get("priority_score") or 0 for t in rows]
