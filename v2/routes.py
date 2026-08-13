@@ -615,7 +615,7 @@ def dashboard(slug):
         abort(404)
 
     import json
-    from v2.charts import mobile_desktop_chart, channels_chart, priority_chart
+    from v2.charts import mobile_desktop_chart, channels_chart, priority_chart, funnel_chart
 
     report      = get_latest_report(slug)          # newest COMPLETE report (for the tabs)
     most_recent = get_most_recent_run(slug)         # newest run of ANY status
@@ -648,6 +648,8 @@ def dashboard(slug):
             a1["leak_map"], a1.get("device_summary"), include_js=True)
     if a1.get("acquisition_insights"):
         charts["channels"] = channels_chart(a1["acquisition_insights"], include_js=False)
+    if a1.get("funnel_stages"):
+        charts["funnel"] = funnel_chart(a1["funnel_stages"], include_js=False)
     if a2.get("ranked_tests"):
         charts["priority"] = priority_chart(a2["ranked_tests"], include_js=False)
 

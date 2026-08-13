@@ -836,6 +836,12 @@
           {{ charts.mobile_desktop | safe }}
         </div>
       {% endif %}
+      {% if charts and charts.get('funnel') %}
+        <div class="card" style="margin-bottom:24px">
+          <div class="card-title">The demand-surface funnel</div>
+          {{ charts.funnel | safe }}
+        </div>
+      {% endif %}
       {% if charts and charts.get('channels') %}
         <div class="card" style="margin-bottom:24px">
           <div class="card-title">Where visitors come from</div>

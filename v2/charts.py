@@ -289,3 +289,82 @@ def priority_chart(ranked_tests: list, include_js: bool = False) -> str | None:
         f'<span>Longer bar = higher priority</span></div>'
     )
     return headline + _to_html(fig, include_js) + legend
+
+
+# ── Chart 4: Demand-surface funnel ──────────────────────────────────────────────
+
+def funnel_chart(funnel_stages: list, include_js: bool = False) -> str | None:
+    """
+    Classic top-down funnel of the demand surface, from Landed to Converted.
+    Linear scale (bars shrink dramatically toward the bottom); the count and the
+    drop-% from the previous stage are labelled on each step so the meaning is
+    read from the labels, not the bar length.
+    """
+    stages = [s for s in (funnel_stages or []) if s.get("users") is not None]
+    if len(stages) < 2:
+        return None
+
+    raw_names = [s.get("stage", "—") for s in stages]
+    users     = [int(s.get("users") or 0) for s in stages]
+    # left-axis label carries the count too, so stages whose bar is an invisible
+    # sliver on a linear scale are still readable.
+    names = [f"{n}  \u00b7  {_fmt(u)}" for n, u in zip(raw_names, users)]
+
+    # drop % from previous stage
+    drops = [None]
+    for i in range(1, len(users)):
+        prev = users[i - 1]
+        drops.append(round(100 * (prev - users[i]) / prev) if prev else 0)
+
+    # headline: the single steepest drop and where it happens
+    worst_i = max(range(1, len(users)), key=lambda i: (drops[i] or 0))
+    headline = _headline(
+        f"The steepest fall is {drops[worst_i]}% &mdash; "
+        f"{raw_names[worst_i-1]} &rarr; {raw_names[worst_i]}."
+    )
+
+    # Plotly's Funnel trace handles the tapering shape natively.
+    # Text on each bar: the count; drop-% shown to the side via annotations.
+    fig = go.Figure(go.Funnel(
+        y=names,
+        x=users,
+        textposition="inside",
+        textinfo="text",                       # only our text; suppress Plotly's default value+percent
+        text=[_fmt(u) for u in users],
+        textfont=dict(family=FONT_MONO, size=12, color="#fff"),
+        marker=dict(color=[
+            ACCENT if i == 0 else
+            RED if (drops[i] or 0) >= 80 else       # brutal drop = red
+            YELLOW_DK if (drops[i] or 0) >= 40 else # heavy drop = dark yellow
+            ACCENT                                   # mild = teal
+            for i in range(len(users))
+        ]),
+        connector=dict(line=dict(color=BORDER, width=1)),
+        hovertemplate="%{y}: %{x:,} users<extra></extra>",
+    ))
+
+    # drop-% annotations to the right of each step (skip the first, no prior stage)
+    annotations = []
+    for i in range(1, len(names)):
+        annotations.append(dict(
+            x=1.0, xref="paper", y=names[i], yref="y",
+            text=f"&#9660; {drops[i]}%",
+            showarrow=False, xanchor="left",
+            font=dict(family=FONT_MONO, size=11,
+                      color=(RED if (drops[i] or 0) >= 80 else INK_2)),
+        ))
+
+    fig.update_layout(_base_layout(
+        height=max(280, 52 * len(stages) + 80),
+        margin=dict(l=8, r=70, t=8, b=8),  # right room for drop labels
+        annotations=annotations,
+    ))
+    fig.update_xaxes(visible=False)
+    fig.update_yaxes(title=None, automargin=True)
+
+    legend = (
+        f'<div style="font-family:{FONT_MONO};font-size:0.7rem;color:{INK_3};'
+        f'margin-top:8px;">&#9660; = drop from the stage above. '
+        f'Red marks the most severe falls (80%+ of visitors lost).</div>'
+    )
+    return headline + _to_html(fig, include_js) + legend
