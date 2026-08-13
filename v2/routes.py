@@ -1100,3 +1100,24 @@ def report_download(slug):
     download_name = f"CABlytics — {client.get('client_name', slug)}.docx"
     return send_file(out_path, as_attachment=True, download_name=download_name,
                      mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+
+@v2.route("/report/<slug>/_debug_a5")
+def _debug_a5(slug):
+    import json
+    from flask import jsonify
+    report = get_latest_report(slug)
+    if not report or not report.get("full_report_json"):
+        return jsonify({"error": "no report"})
+    full = json.loads(report["full_report_json"])
+    agents = full.get("agents", {})
+    a5 = agents.get("5", {})
+    return jsonify({
+        "agents_keys": list(agents.keys()),
+        "a5_type": type(a5).__name__,
+        "a5_top_keys": list(a5.keys()) if isinstance(a5, dict) else "(not a dict)",
+        "has_weeks": isinstance(a5, dict) and "weeks" in a5,
+        "weeks_len": len(a5["weeks"]) if isinstance(a5, dict) and isinstance(a5.get("weeks"), list) else None,
+        "first_week_keys": (list(a5["weeks"][0].keys())
+                            if isinstance(a5, dict) and a5.get("weeks") and isinstance(a5["weeks"][0], dict)
+                            else None),
+    })
