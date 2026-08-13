@@ -132,6 +132,16 @@
     .btn-rerun:disabled { opacity: 0.4; cursor: not-allowed; }
     .btn-rerun:disabled:hover { background: transparent; color: var(--ink-on-dark); border-color: rgba(255,255,255,0.25); }
 
+    .ap-check {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.72rem;
+      color: rgba(255,255,255,0.7);
+      cursor: pointer;
+    }
+    .ap-check input { cursor: pointer; }
+
     /* ── Running banner ── */
     .running-banner {
       background: var(--brand-yellow);
@@ -753,6 +763,12 @@
       <span class="header-status complete">Up to date</span>
     {% else %}
       <span class="header-status no_report">No report yet</span>
+    {% endif %}
+    {% if has_report %}
+    <label class="ap-check">
+      <input type="checkbox" id="ap-toggle" checked> Action plan
+    </label>
+    <a class="btn-rerun" id="download-btn" href="/v2/report/{{ client.client_slug }}/download">↓ Download</a>
     {% endif %}
     <button class="btn-rerun" id="rerun-btn" onclick="triggerRerun()"
       {% if is_running %}disabled{% endif %}>
@@ -1524,6 +1540,17 @@
   {% if is_running %}
   pollStatus();
   {% endif %}
+  // Download button — checkbox controls whether the action plan is included
+    (function () {
+      var btn = document.getElementById('download-btn');
+      var chk = document.getElementById('ap-toggle');
+      if (btn && chk) {
+        btn.addEventListener('click', function () {
+          var base = '/v2/report/{{ client.client_slug }}/download';
+          btn.href = base + (chk.checked ? '' : '?action_plan=0');
+        });
+      }
+    })();
 </script>
 </body>
 </html>

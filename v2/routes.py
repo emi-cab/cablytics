@@ -1060,3 +1060,43 @@ def console_run():
         "message": "Pipeline started.",
         "next": f"/v2/dashboard/{slug}",
     })
+
+@v2.route("/report/<slug>/download")
+def report_download(slug):
+    import json, os, tempfile
+    from flask import send_file, abort
+    from v2.report_generator import generate_report
+
+    client = get_client_by_slug(slug)
+    if not client:
+        abort(404)
+
+    report = get_latest_report(slug)
+    if not report or not report.get("full_report_json"):
+        abort(404, "No completed report to download for this client.")
+
+    try:
+        full = json.loads(report["full_report_json"])
+    except (json.JSONDecodeError, TypeError):
+        abort(500, "Report data could not be read.")
+
+    # Shape the data the generator expects (same unpacking dashboard() uses)
+    report_data = {
+        "client_name": client.get("client_name", slug),
+        "date": (report.get("completed_at") or "")[:10],
+        "agents": full.get("agents", {}),
+    }
+
+    include_ap = request.args.get("action_plan", "1") != "0"
+
+    template_path = os.path.join(
+        os.path.dirname(__file__), "templates", "report_template.docx")
+    out_path = os.path.join(
+        tempfile.gettempdir(), f"cablytics_report_{slug}.docx")
+
+    generate_report(report_data, template_path, out_path,
+                    include_action_plan=include_ap)
+
+    download_name = f"CABlytics — {client.get('client_name', slug)}.docx"
+    return send_file(out_path, as_attachment=True, download_name=download_name,
+                     mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
