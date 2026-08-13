@@ -153,6 +153,31 @@
     }
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
+    /* ── Failed banner ── */
+    .failed-banner {
+      background: rgba(255,82,82,0.1);
+      border-bottom: 1px solid rgba(255,82,82,0.35);
+      padding: 12px 48px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      color: var(--red);
+      font-size: 0.85rem;
+    }
+    .failed-icon { flex-shrink: 0; font-size: 1rem; line-height: 1.5; }
+    .failed-text { display: flex; flex-direction: column; gap: 3px; line-height: 1.5; }
+    .failed-detail {
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      color: var(--ink-2);
+      background: rgba(255,82,82,0.06);
+      padding: 4px 8px;
+      border-radius: 4px;
+      word-break: break-word;
+    }
+    .failed-sub { font-size: 0.8rem; color: var(--ink-3); }
+    @media (max-width: 768px) { .failed-banner { padding: 12px 20px; } }
+
     /* ── Hero ── */
     .hero {
       padding: 52px 48px 0;
@@ -740,6 +765,18 @@
 <div class="running-banner">
   <div class="running-dot"></div>
   <span>Report is currently running — this page will refresh automatically when complete.</span>
+</div>
+{% endif %}
+{% if failed_run %}
+<div class="failed-banner">
+  <div class="failed-icon">⚠</div>
+  <div class="failed-text">
+    <strong>The last run failed.</strong>
+    {% if failed_run.error_message %}
+      <span class="failed-detail">{{ failed_run.error_message }}</span>
+    {% endif %}
+    <span class="failed-sub">The report below is from the last successful run{% if report.completed_at %} ({{ report.completed_at[:10] }}){% endif %}. Re-run to try again.</span>
+  </div>
 </div>
 {% endif %}
 

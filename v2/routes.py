@@ -38,6 +38,7 @@ from v2.db import (
     update_client,
     get_client_by_slug,
     list_clients,
+    get_most_recent_run,
     get_latest_report,
     get_active_report,
     list_reports,
@@ -615,7 +616,8 @@ def dashboard(slug):
 
     import json
 
-    report      = get_latest_report(slug)
+    report      = get_latest_report(slug)          # newest COMPLETE report (for the tabs)
+    most_recent = get_most_recent_run(slug)         # newest run of ANY status
     active      = get_active_report(client["id"])
     report_data = {}
     agents      = {}
@@ -628,6 +630,14 @@ def dashboard(slug):
         except (json.JSONDecodeError, TypeError):
             pass
 
+    # Surface a failed most-recent run: only when the newest run failed AND
+    # nothing is currently running. We still pass the last good report so its
+    # tabs remain viewable beneath the failure notice.
+    failed_run = None
+    if (most_recent and most_recent.get("status") == "failed"
+            and not active):
+        failed_run = most_recent
+
     recent_runs = list_reports(slug, limit=5)
 
     return render_template(
@@ -636,6 +646,7 @@ def dashboard(slug):
         report=report_data,
         agents=agents,
         active_run=active,
+        failed_run=failed_run,
         recent_runs=recent_runs,
     )
 
