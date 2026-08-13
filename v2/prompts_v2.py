@@ -210,6 +210,13 @@ brief honest strings, NOT padded):
     "top_exit_channels": "Which channels show highest bounce",
     "time_patterns": "Peak traffic time and whether engagement correlates"
   },
+  "funnel_stages": [
+    {
+      "stage": "Plain-English stage name, e.g. 'Landed', 'Engaged', 'Reached 50% scroll', 'Showed intent', 'Converted'",
+      "users": 9290,
+      "note": "One short phrase: what this stage means and, if this is a drop from the prior stage, which demand-state transition the drop represents (e.g. 'emerging_to_active leak here')"
+    }
+  ],
   "top_3_hypotheses": [
     {
       "priority": 1,
@@ -271,6 +278,13 @@ prioritising.
 
 When you reference a URL, tag it with its page type from the mapping above.
 If a URL has no mapping, use "unknown" as the page_type.
+Populate `funnel_stages` as an ordered list from widest to narrowest — the
+demand-surface funnel for the primary page. Use the actual counts from the
+data: total sessions, engaged sessions, users reaching scroll/content depth,
+users showing intent, and conversions. Only include stages the data actually
+supports with a real number; omit any stage you cannot ground in a figure.
+This array drives the funnel chart, so each stage needs a real integer in
+`users`. 
 For each leak, populate the demand_state object: map the leak to the demand
 transition its drop-off evidences, state whether you confirmed or corrected any
 provisional transition given above, and cite the specific number that justifies
@@ -316,6 +330,7 @@ Your JSON must follow this exact structure:
   "ranked_tests": [
     {
       "rank": 1,
+      "test_name": "2-4 word plain-English name for this test, e.g. 'Above-the-fold summary', 'Transparent pricing', 'Sticky mobile CTA'. This is a chart/label-friendly name, NOT the hypothesis.",
       "page": "/path",
       "page_type": "homepage|plp|pdp|cart|checkout|category|other|unknown",
       "hypothesis": "If/Then/Because statement",

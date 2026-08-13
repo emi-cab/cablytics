@@ -209,6 +209,16 @@ def priority_chart(ranked_tests: list, include_js: bool = False) -> str | None:
         the table below the chart.
         """
         rank = t.get("rank", "")
+
+        # Prefer Agent 2's authored short name when present (clean, model-written).
+        # Fall back to deriving one from the hypothesis for older reports that
+        # predate the test_name field.
+        authored = (t.get("test_name") or "").strip()
+        if authored:
+            name = authored if len(authored) <= 42 else authored[:40].rstrip() + "\u2026"
+            name = name[0].upper() + name[1:]
+            return f"{rank}. {name}" if rank else name
+
         h = (t.get("hypothesis") or "").strip()
         ttype = (t.get("test_type") or "").strip()
 
