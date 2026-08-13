@@ -965,7 +965,7 @@
           {{ charts.priority | safe }}
         </div>
       {% endif %}
-      
+
       <div class="section-title">Ranked test ideas</div>
       <div class="section-sub">Priority = (Impact × Confidence) ÷ Effort</div>
 
@@ -1437,7 +1437,7 @@
               <div class="calendar-test">
                 <span class="calendar-test-label label-running">Running</span>
                 <div class="calendar-test-content">
-                  <div class="calendar-test-page">{{ test.get('page', test if test is string else '—') }}</div>
+                  <div class="calendar-test-page">{% if test is mapping %}{{ test.get('page', '—') }}{% else %}{{ test }}{% endif %}</div>
                 </div>
               </div>
             {% endfor %}
@@ -1445,7 +1445,7 @@
               <div class="calendar-test">
                 <span class="calendar-test-label label-completing">Completing</span>
                 <div class="calendar-test-content">
-                  <div class="calendar-test-page">{{ test.get('page', test if test is string else '—') }}</div>
+                  <div class="calendar-test-page">{% if test is mapping %}{{ test.get('page', '—') }}{% else %}{{ test }}{% endif %}</div>
                 </div>
               </div>
             {% endfor %}
