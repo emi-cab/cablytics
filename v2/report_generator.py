@@ -242,21 +242,31 @@ def _build_body(report: dict, include_action_plan: bool, sect_pr: str = "") -> s
     # ── 4. Action plan (optional) ──
     if include_action_plan:
         parts.append(_heading("4. Action plan", 1))
-        calendar = a5.get("calendar") or []
-        if calendar:
-            for week in calendar:
-                wk = week.get("week") or week.get("label") or "Week"
-                parts.append(_heading(str(wk), 3))
-                launches = week.get("launch") or []
-                if launches:
-                    for item in launches:
-                        if isinstance(item, dict):
-                            label = item.get("test_name") or item.get("page") or "—"
+        weeks = a5.get("weeks") or []
+        if weeks:
+            for wk in weeks:
+                num = wk.get("week")
+                focus = wk.get("focus") or ""
+                # Heading: "Week 1 — <focus theme>"
+                title = f"Week {num}" if num is not None else "Week"
+                if focus:
+                    title += f"  ·  {focus}"
+                parts.append(_heading(title, 3))
+
+                tests = wk.get("tests") or []
+                if tests:
+                    for t in tests:
+                        if isinstance(t, dict):
+                            name = t.get("test_name") or t.get("page") or "—"
+                            status = t.get("status")
+                            line = name
+                            if status:
+                                line += f"  ({status})"
                         else:
-                            label = str(item)
-                        parts.append(_bullet(f"Launch: {label}"))
+                            line = str(t)
+                        parts.append(_bullet(line))
                 else:
-                    parts.append(_para("No launches scheduled.", italic=True))
+                    parts.append(_para("No tests scheduled this week.", italic=True))
                 parts.append(_spacer())
         else:
             parts.append(_para("No action plan was produced for this run.",
