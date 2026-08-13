@@ -830,6 +830,18 @@
       {% if a1.get('summary') %}
         <div class="summary-box">{{ a1.summary }}</div>
       {% endif %}
+      {% if charts and charts.get('mobile_desktop') %}
+        <div class="card" style="margin-bottom:24px">
+          <div class="card-title">Mobile vs desktop</div>
+          {{ charts.mobile_desktop | safe }}
+        </div>
+      {% endif %}
+      {% if charts and charts.get('channels') %}
+        <div class="card" style="margin-bottom:24px">
+          <div class="card-title">Where visitors come from</div>
+          {{ charts.channels | safe }}
+        </div>
+      {% endif %}
 
       <div class="section-title">Revenue leak map</div>
       <div class="section-sub">Pages where drop-off is disproportionate to traffic share</div>
@@ -947,6 +959,13 @@
         </div>
       {% endif %}
 
+      {% if charts and charts.get('priority') %}
+        <div class="card" style="margin-bottom:24px">
+          <div class="card-title">Recommended tests, in priority order</div>
+          {{ charts.priority | safe }}
+        </div>
+      {% endif %}
+      
       <div class="section-title">Ranked test ideas</div>
       <div class="section-sub">Priority = (Impact × Confidence) ÷ Effort</div>
 

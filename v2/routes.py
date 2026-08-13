@@ -615,6 +615,7 @@ def dashboard(slug):
         abort(404)
 
     import json
+    from v2.charts import mobile_desktop_chart, channels_chart, priority_chart
 
     report      = get_latest_report(slug)          # newest COMPLETE report (for the tabs)
     most_recent = get_most_recent_run(slug)         # newest run of ANY status
@@ -638,6 +639,18 @@ def dashboard(slug):
             and not active):
         failed_run = most_recent
 
+    # Build stakeholder charts from the agent data (None if data can't support one)
+    charts = {}
+    a1 = agents.get("1", {})
+    a2 = agents.get("2", {})
+    if a1.get("leak_map"):
+        charts["mobile_desktop"] = mobile_desktop_chart(
+            a1["leak_map"], a1.get("device_summary"), include_js=True)
+    if a1.get("acquisition_insights"):
+        charts["channels"] = channels_chart(a1["acquisition_insights"], include_js=False)
+    if a2.get("ranked_tests"):
+        charts["priority"] = priority_chart(a2["ranked_tests"], include_js=False)
+
     recent_runs = list_reports(slug, limit=5)
 
     return render_template(
@@ -648,6 +661,7 @@ def dashboard(slug):
         active_run=active,
         failed_run=failed_run,
         recent_runs=recent_runs,
+        charts=charts,
     )
 
 
